@@ -1,8 +1,10 @@
 // my includes
 #include "../includes/Benchmark.h"
 #include "../includes/Cbs.h"
+#include "../includes/ResultsWriter.h"
 #include <iostream>
 #include <string>
+#include <filesystem>
 
 
 int main(int argc, char** argv) { 
@@ -15,17 +17,16 @@ int main(int argc, char** argv) {
 		<explanation cost> = decimal in range of [0, 1]
 			Note: only required when using XG-A-H
 
-	To Plan: <executable> Plan <High-Level Algorithm> 
- 		<Low-Level Algorithm> <filename>.yaml 
- 		<computation time> <explanation cost (only for XG-CBS)>
- 		<weight on exp. cost (only for XG-A-H)>
+	To Plan: <executable> Plan <filename>.yaml <High-Level Algorithm>
+		<Low-Level Algorithm> <computation time> <explanation cost (only for XG-CBS)>
+		<weight on exp. cost (only for XG-A-H)>
 
-	To Benchmark 1 file: <executable> Benchmark 
-		<Low-Level Algorithm> <filename>.yaml 
+	To Benchmark 1 file: <executable> Benchmark
+		<Low-Level Algorithm> <filename>.yaml
 		<computation time> <result>.csv <weight on exp. cost (only for XG-A-H)>
 
-	To Benchmark Many Files: <executable> MultiBenchmark 
-		<Low-Level Algorithm> <directory> 
+	To Benchmark Many Files: <executable> MultiBenchmark
+		<Low-Level Algorithm> <directory>
 		<computation time> <result>.csv <weight on exp. cost (only for XG-A-H)>
 
 	*/
@@ -36,15 +37,17 @@ int main(int argc, char** argv) {
 		
 		if (expType == "Plan")
 		{
-			const std::string cbsType(argv[2]);  // {CBS, XG-CBS}
-			const std::string aStarType(argv[3]);  // {A, XG-A, XG-A-H}
-			const std::string inputYaml(argv[4]);  // <path/fileName>.yaml
+			std::string inputYaml(argv[2]);  // <path/fileName>.yaml or just fileName.yaml (looked up in envs/)
+			if (inputYaml.find('/') == std::string::npos)
+				inputYaml = "envs/" + inputYaml;
+			const std::string cbsType(argv[3]);   // {CBS, XG-CBS}
+			const std::string aStarType(argv[4]); // {A, XG-A, XG-A-H, S-A}
 			const double planningTime = atof(argv[5]);  // { real number > 0 }
 
 			// create environment from yaml file (assumed to be a file)
 			Environment *mapf = yaml2env(inputYaml);
 
-			std::string dir2file = inputYaml.substr(inputYaml.rfind("/")+1);
+			std::string dir2file = inputYaml.substr(inputYaml.rfind("/") + 1);
 			const std::string::size_type end = dir2file.find(".yaml");
 			const std::string mapName = dir2file.erase(end, dir2file.length());
 
@@ -61,6 +64,12 @@ int main(int argc, char** argv) {
 					CBS *planner = new CBS(mapf);
 					planner->setSolveTime(planningTime);
 					success = planner->plan(mapf->getStarts(), solution);
+					if (success) {
+						writePlanResults(inputYaml, cbsType, aStarType, planningTime,
+							0, 0.0, solution, mapf->getAgentNames(),
+							planner->getCompTime(), planner->closed_set_.size() + 1,
+							planner->getSolutionNode()->calcCost(), planner->getSolutionNode()->getSegCost());
+					}
 				}
 				else
 					printf("Terminating prematurely due to invalid arguments.\n");
@@ -75,12 +84,24 @@ int main(int argc, char** argv) {
 					XG_CBS *planner = new XG_CBS(mapf, costBound, percent_Explanation);
 					planner->setSolveTime(planningTime);
 					success = planner->plan(mapf->getStarts(), solution, false, false, false);
+					if (success) {
+						writePlanResults(inputYaml, cbsType, aStarType, planningTime,
+							costBound, percent_Explanation, solution, mapf->getAgentNames(),
+							planner->getCompTime(), planner->closed_set_.size() + 1,
+							planner->getSolutionNode()->calcCost(), planner->getSolutionNode()->getSegCost());
+					}
 				}
 				else if (aStarType == "XG-A" && argc == 7)
 				{
 					XG_CBS *planner = new XG_CBS(mapf, costBound, percent_Explanation);
 					planner->setSolveTime(planningTime);
 					success = planner->plan(mapf->getStarts(), solution, true, false, false);
+					if (success) {
+						writePlanResults(inputYaml, cbsType, aStarType, planningTime,
+							costBound, percent_Explanation, solution, mapf->getAgentNames(),
+							planner->getCompTime(), planner->closed_set_.size() + 1,
+							planner->getSolutionNode()->calcCost(), planner->getSolutionNode()->getSegCost());
+					}
 				}
 				else if (aStarType == "XG-A-H" && argc == 8)
 				{
@@ -88,41 +109,40 @@ int main(int argc, char** argv) {
 					XG_CBS *planner = new XG_CBS(mapf, costBound, percent_Explanation);
 					planner->setSolveTime(planningTime);
 					success = planner->plan(mapf->getStarts(), solution, false, true, false);
+					if (success) {
+						writePlanResults(inputYaml, cbsType, aStarType, planningTime,
+							costBound, percent_Explanation, solution, mapf->getAgentNames(),
+							planner->getCompTime(), planner->closed_set_.size() + 1,
+							planner->getSolutionNode()->calcCost(), planner->getSolutionNode()->getSegCost());
+					}
 				}
 				else if (aStarType == "S-A")
 				{
 					XG_CBS *planner = new XG_CBS(mapf, costBound, percent_Explanation);
 					planner->setSolveTime(planningTime);
 					success = planner->plan(mapf->getStarts(), solution, false, false, true);
-				}	
+					if (success) {
+						writePlanResults(inputYaml, cbsType, aStarType, planningTime,
+							costBound, percent_Explanation, solution, mapf->getAgentNames(),
+							planner->getCompTime(), planner->closed_set_.size() + 1,
+							planner->getSolutionNode()->calcCost(), planner->getSolutionNode()->getSegCost());
+					}
+				}
 				else
 					printf("Terminating prematurely due to invalid low-level planner.\n");
 			}
 			else
 				printf("Terminating prematurely due to invalid high-level planner.\n");
 			
-			// we have planned, now output solution to file if applicable
-			if (success)
-			{
-				const std::string output_name = "txt/" + mapName + "_sol.txt";
-				std::ofstream out(output_name);
-				std::cout << "Outputting Solution to: " << output_name << std::endl;
-				for (std::vector<State*> agentSol: solution)
-				{
-					int it = std::distance(solution.begin(), 
-						std::find(solution.begin(), solution.end(), agentSol));
-					out << mapf->getAgentNames()[it] << std::endl;
-					for (State *st: agentSol)
-						out << *st << std::endl;
-				}
-			}
 		}
 		else if (expType == "Benchmark")
 		{
 			if (argc >= 6)
 			{
 				const std::string aStarType(argv[2]);
-				const std::string inputYaml(argv[3]);  // <path/fileName>.yaml
+				std::string inputYaml(argv[3]);  // <path/fileName>.yaml or just fileName.yaml (looked up in envs/)
+				if (inputYaml.find('/') == std::string::npos)
+					inputYaml = "envs/" + inputYaml;
 				const double planningTime = atof(argv[4]);  // real number > 0
 				const std::string resultName(argv[5]);
 				double percent_Explanation = 0.0;
@@ -131,7 +151,7 @@ int main(int argc, char** argv) {
 				// create environment from yaml file (assumed to be a file)
 				Environment *mapf = yaml2env(inputYaml);
 
-				std::string dir2file = inputYaml.substr(inputYaml.rfind("/")+1);
+				std::string dir2file = inputYaml.substr(inputYaml.rfind("/") + 1);
 				const std::string::size_type end = dir2file.find(".yaml");
 				const std::string mapName = dir2file.erase(end, dir2file.length());
 
@@ -149,7 +169,9 @@ int main(int argc, char** argv) {
 			if (argc >= 6)
 			{
 				const std::string aStarType(argv[2]);
-				const std::string inputYaml(argv[3]);  // path/to/*.yaml
+				std::string inputDir(argv[3]);  // directory path; if no slash, use envs/
+				if (inputDir.find('/') == std::string::npos)
+					inputDir = "envs";
 				const double planningTime = atof(argv[4]);  // real number > 0
 				const std::string resultName(argv[5]);
 				double percent_Explanation = 0.0;
@@ -157,7 +179,7 @@ int main(int argc, char** argv) {
 					percent_Explanation = atof(argv[6]);
 
 				std::vector<std::pair <std::string, std::vector<std::string>> > data = 
-					multiMapBenchmark(inputYaml, planningTime, aStarType, percent_Explanation);
+					multiMapBenchmark(inputDir, planningTime, aStarType, percent_Explanation);
 				write_csv(resultName, data);
 			}
 			else

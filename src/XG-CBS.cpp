@@ -1020,7 +1020,8 @@ bool XG_CBS::plan(const std::vector<State*>& startStates, Solution& solution,
 	bool isOverTime = false;
 	bool isSolved = false;
 	std::cout << "Now Planning with XG-CBS" << std::endl;
-	
+	std::cout << "Explanation cost bound (max segments allowed): " << getBound() << " (solutions with segment cost <= this are accepted)" << std::endl;
+
 	// set timer
 	const std::chrono::time_point<std::chrono::high_resolution_clock> start = std::chrono::high_resolution_clock::now();
 	std::thread timeThread(Timer(), start, solveTime_, std::ref(isOverTime), std::ref(isSolved));
