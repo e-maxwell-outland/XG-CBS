@@ -158,5 +158,14 @@ std::string writePlanResults(
 	else
 		std::cout << "Plot saved to: " << plotPath << std::endl;
 
+	// Auto-generate segmented plot
+	std::string segmentsPlotPath = expDir + "/segments.png";
+	std::string segmentsCmd = "python3 visualize.py " + expDir + " --segments -o " + segmentsPlotPath + " 2>/dev/null";
+	int segmentsRet = std::system(segmentsCmd.c_str());
+	if (segmentsRet != 0)
+		std::cerr << "Warning: could not generate segments plot (ensure python3 with matplotlib and PyYAML is available)." << std::endl;
+	else
+		std::cout << "Segments plot saved to: " << segmentsPlotPath << std::endl;
+
 	return expDir;
 }

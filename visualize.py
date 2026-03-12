@@ -108,6 +108,107 @@ def visualize(env: dict, result: dict, ax=None, show_start_goal=True):
     return ax
 
 
+def visualize_segments(env: dict, result: dict, segment_cost: int):
+    """Create a figure with subfigures for each segment cost level.
+    Each subfigure shows agent positions at that cost level."""
+    dims = env["map"]["dimensions"]
+    nx, ny = dims[0], dims[1]
+    obstacles = env["map"].get("obstacles") or []
+    agents_cfg = {a["name"]: a for a in env["agents"]}
+    plans = result["plans"]
+
+    # Distinct colors for agents
+    colors = [
+        "#377eb8", "#e41a1c", "#4daf4a", "#984ea3",
+        "#ff7f00", "#a65628", "#f781bf", "#999999",
+    ]
+
+    # Calculate grid layout (prefer square-ish layout)
+    n_segments = segment_cost
+    n_cols = int(n_segments ** 0.5) + (1 if n_segments ** 0.5 != int(n_segments ** 0.5) else 0)
+    n_rows = (n_segments + n_cols - 1) // n_cols
+
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(6 * n_cols, 5 * n_rows))
+    if n_segments == 1:
+        axes = [axes]
+    else:
+        axes = axes.flatten()
+
+    # For each segment (cost level)
+    for seg_idx in range(n_segments):
+        cost_level = seg_idx + 1
+        ax = axes[seg_idx]
+
+        # Grid: use cell centers at (0.5, 0.5), (1.5, 0.5), ... so cells are [0,1] x [0,1] etc.
+        ax.set_xlim(-0.5, nx - 0.5)
+        ax.set_ylim(-0.5, ny - 0.5)
+        ax.set_aspect("equal")
+        ax.set_facecolor("#f8f8f8")
+        ax.set_title(f"Segment {cost_level} (cost={cost_level})", fontsize=12, fontweight="bold")
+
+        # Grid lines
+        for x in range(nx + 1):
+            ax.axvline(x - 0.5, color="#ccc", linewidth=0.8)
+        for y in range(ny + 1):
+            ax.axhline(y - 0.5, color="#ccc", linewidth=0.8)
+
+        # Obstacles
+        for cell in obstacles:
+            x, y = cell[0], cell[1]
+            rect = mpatches.Rectangle((x - 0.5, y - 0.5), 1, 1, facecolor="#333", edgecolor="#111")
+            ax.add_patch(rect)
+
+        # For each agent, show positions at this cost level
+        for i, (agent_name, path) in enumerate(plans.items()):
+            color = colors[i % len(colors)]
+            # Filter positions with this cost level
+            positions_at_cost = [p for p in path if p["cost"] == cost_level]
+            
+            if positions_at_cost:
+                xs = [p["x"] for p in positions_at_cost]
+                ys = [p["y"] for p in positions_at_cost]
+                
+                # Draw positions
+                ax.scatter(xs, ys, c=color, s=100, zorder=4, edgecolors="white", 
+                          linewidths=1.5, label=agent_name, alpha=0.9)
+                
+                # Draw connections between consecutive positions at this cost level
+                if len(positions_at_cost) > 1:
+                    ax.plot(xs, ys, color=color, linewidth=2, zorder=3, alpha=0.7)
+
+        # Show start/goal for context (only if they're at this cost level or nearby)
+        for i, (agent_name, path) in enumerate(plans.items()):
+            if agent_name not in agents_cfg:
+                continue
+            color = colors[i % len(colors)]
+            start = agents_cfg[agent_name]["start"]
+            goal = agents_cfg[agent_name]["goal"]
+            
+            # Check if start or goal positions are at this cost level
+            start_at_cost = any(p["x"] == start[0] and p["y"] == start[1] and p["cost"] == cost_level 
+                               for p in path)
+            goal_at_cost = any(p["x"] == goal[0] and p["y"] == goal[1] and p["cost"] == cost_level 
+                              for p in path)
+            
+            if start_at_cost:
+                ax.scatter([start[0]], [start[1]], marker="o", s=200, c=color, 
+                          edgecolors="black", linewidths=2, zorder=5)
+            if goal_at_cost:
+                ax.scatter([goal[0]], [goal[1]], marker="*", s=350, c=color, 
+                          edgecolors="black", linewidths=1.5, zorder=5)
+
+        # Legend only for first subplot
+        if seg_idx == 0:
+            ax.legend(loc="upper left", fontsize=8)
+
+    # Hide unused subplots
+    for idx in range(n_segments, len(axes)):
+        axes[idx].set_visible(False)
+
+    plt.tight_layout()
+    return fig
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Visualize MAPF result: grid, obstacles, and agent paths."
@@ -128,6 +229,11 @@ def main():
         action="store_true",
         help="Do not draw start/goal markers",
     )
+    parser.add_argument(
+        "--segments",
+        action="store_true",
+        help="Visualize plans segmented by cost (one subfigure per segment)",
+    )
     args = parser.parse_args()
 
     path = Path(args.path)
@@ -142,8 +248,12 @@ def main():
         print(e, file=sys.stderr)
         sys.exit(1)
 
-    fig, ax = plt.subplots(figsize=(8, 6))
-    visualize(env, result, ax=ax, show_start_goal=not args.no_start_goal)
+    if args.segments:
+        segment_cost = result["metrics"].get("segment_cost", 1)
+        fig = visualize_segments(env, result, segment_cost)
+    else:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        visualize(env, result, ax=ax, show_start_goal=not args.no_start_goal)
 
     if args.output:
         fig.savefig(args.output, dpi=150, bbox_inches="tight")
