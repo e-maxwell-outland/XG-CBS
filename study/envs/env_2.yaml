@@ -1,9 +1,9 @@
 map:
   dimensions: [9, 6]
   # Horizontal wall at y=3 with single gap at (4,3).
-  # 4 agents travel top→bottom; each agent's start_x == goal_x so no horizontal
-  # crossing is needed — agents just queue through the bottleneck (4,3).
-  # All 4 must visit (4,3) → segment_cost >= 4.
+  # 3 agents travel top→bottom; start_x == goal_x so no horizontal crossing needed.
+  # Agent1 at x=4 goes straight through the gap; agents 0,2 make small detours.
+  # All 3 must visit (4,3) → segment_cost >= 3.
   # Full boundary seal: entire y=6 phantom row + x=9 phantom column.
   obstacles:
     - [0, 3]   # wall
@@ -33,14 +33,11 @@ map:
 
 agents:
   - name: "agent0"
-    start: [1, 5]
-    goal:  [1, 0]
+    start: [2, 5]
+    goal:  [2, 0]
   - name: "agent1"
-    start: [3, 5]
-    goal:  [3, 0]
+    start: [4, 5]
+    goal:  [4, 0]
   - name: "agent2"
-    start: [5, 5]
-    goal:  [5, 0]
-  - name: "agent3"
-    start: [7, 5]
-    goal:  [7, 0]
+    start: [6, 5]
+    goal:  [6, 0]
