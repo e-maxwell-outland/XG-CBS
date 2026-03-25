@@ -1,0 +1,18 @@
+map:
+  dimensions: [9, 9]
+  # Open grid — perpendicular pair (agents 0&1) guaranteed to share (4,4).
+  # Diagonal pair (agents 2&3) travel opposite diagonals and cross near center.
+
+agents:
+  - name: "agent0"
+    start: [0, 4]
+    goal:  [8, 4]
+  - name: "agent1"
+    start: [4, 8]
+    goal:  [4, 0]
+  - name: "agent2"
+    start: [0, 0]
+    goal:  [8, 8]
+  - name: "agent3"
+    start: [8, 0]
+    goal:  [0, 8]
