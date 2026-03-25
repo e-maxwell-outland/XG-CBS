@@ -11,6 +11,7 @@ map:
     - [5, 3]
     - [6, 3]
     - [7, 3]
+    - [8, 3]   # seals boundary column (planner allows x=8 via off-by-one)
 
 agents:
   - name: "agent0"

@@ -3,8 +3,12 @@ map:
   # Two horizontal lanes (y=1, y=3) connected by a 2-cell-wide bridge at x=3,4.
   # All other cells are obstacles. Every agent must cross the bridge, guaranteeing
   # spatial overlap among all three agents → segment_cost >= 3.
+  #
+  # Boundary sealing: planner allows x=7 and y=5 via off-by-one in bounds check.
+  # (7,0), (7,2), (7,4) block the x=7 column so agents can't bypass the bridge
+  # by going around the right edge. The y=4 wall already prevents reaching y=5.
   obstacles:
-    # y=0 row (floor)
+    # y=0 row (floor, x=0..7)
     - [0, 0]
     - [1, 0]
     - [2, 0]
@@ -12,13 +16,15 @@ map:
     - [4, 0]
     - [5, 0]
     - [6, 0]
+    - [7, 0]   # boundary
     # y=2 row — bridge gap at x=3 and x=4
     - [0, 2]
     - [1, 2]
     - [2, 2]
     - [5, 2]
     - [6, 2]
-    # y=4 row (ceiling)
+    - [7, 2]   # boundary — blocks x=7 bypass route
+    # y=4 row (ceiling, x=0..7)
     - [0, 4]
     - [1, 4]
     - [2, 4]
@@ -26,6 +32,7 @@ map:
     - [4, 4]
     - [5, 4]
     - [6, 4]
+    - [7, 4]   # boundary — prevents reaching y=5
 
 agents:
   - name: "agent0"
