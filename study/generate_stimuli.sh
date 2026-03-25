@@ -15,8 +15,8 @@
 #
 # Configurable variables:
 K=${K:-2}                        # extra segments for Condition B (default 2)
-COST_BOUND=${COST_BOUND:-4}      # XG-CBS explanation cost bound
-TIME_LIMIT=${TIME_LIMIT:-60.0}   # planner time limit in seconds
+COST_BOUND=${COST_BOUND:-8}      # XG-CBS explanation cost bound (raised: some envs need >4 segments)
+TIME_LIMIT=${TIME_LIMIT:-300.0}  # planner time limit in seconds (5 min per env)
 PLANNER_BIN=./build/Planner
 STUDY_DIR=study
 
