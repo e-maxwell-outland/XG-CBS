@@ -1,15 +1,38 @@
 map:
   dimensions: [7, 7]
-  # Open grid — agents0/1 go perpendicular, guaranteed to share (3,3).
-  # Agent2 crosses diagonally and likely shares cells with both.
+  # Vertical barrier at x=3, single gap at y=3.
+  # All three agents must pass through (3,3) → guaranteed segment_cost >= 3.
+  # Full boundary seal: y=7 phantom row + x=7 phantom column.
+  obstacles:
+    - [3, 0]   # barrier (gap at y=3)
+    - [3, 1]
+    - [3, 2]
+    - [3, 4]
+    - [3, 5]
+    - [3, 6]
+    - [0, 7]   # y=7 phantom row
+    - [1, 7]
+    - [2, 7]
+    - [3, 7]
+    - [4, 7]
+    - [5, 7]
+    - [6, 7]
+    - [7, 7]
+    - [7, 0]   # x=7 phantom column
+    - [7, 1]
+    - [7, 2]
+    - [7, 3]
+    - [7, 4]
+    - [7, 5]
+    - [7, 6]
 
 agents:
   - name: "agent0"
-    start: [0, 3]
-    goal:  [6, 3]
-  - name: "agent1"
-    start: [3, 6]
-    goal:  [3, 0]
-  - name: "agent2"
     start: [0, 0]
     goal:  [6, 6]
+  - name: "agent1"
+    start: [0, 3]
+    goal:  [6, 3]
+  - name: "agent2"
+    start: [0, 6]
+    goal:  [6, 0]
