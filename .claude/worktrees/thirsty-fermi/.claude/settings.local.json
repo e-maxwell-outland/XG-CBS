@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod +x /Users/emaxwell/VSCodeProjects/XG-CBS/.claude/worktrees/thirsty-fermi/study/generate_stimuli.sh)",
+      "Bash(python3 -c \"import visualize; print\\(''visualize.py OK''\\)\")",
+      "Bash(python3 -c \"import study.apply_fixed_interval; print\\(''apply_fixed_interval.py OK''\\)\")",
+      "Bash(python3 visualize.py results/3-24/exp-0/ --condition-a --k 2 -o /tmp/test_condition_a.png)",
+      "Bash(python3 -c \":*)",
+      "Read(//Users/emaxwell/VSCodeProjects/XG-CBS/**)",
+      "Bash(python3 .claude/worktrees/thirsty-fermi/visualize.py results/3-24/exp-0/ --condition-a --k 2 -o /tmp/test_condition_a.png)",
+      "Bash(python3 .claude/worktrees/thirsty-fermi/study/apply_fixed_interval.py results/3-24/exp-0/ --k 2 -o /tmp/test_b/)",
+      "Bash(python3 .claude/worktrees/thirsty-fermi/visualize.py /tmp/test_b/ --condition-b -o /tmp/test_condition_b.png)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
