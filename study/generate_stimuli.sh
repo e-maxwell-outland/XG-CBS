@@ -49,11 +49,14 @@ for ENV in "${ENVS[@]}"; do
 
     # --- Run XG-CBS ---
     info "Running XG-CBS on $ENV…"
+    # Stamp a temp file before running the planner so we can find the new result dir.
+    _TS=$(mktemp)
     $PLANNER_BIN Plan "$ENV_YAML" XG-CBS XG-A "$TIME_LIMIT" "$COST_BOUND" 2>&1
-    # The planner writes results to results/{M-D}/exp-{N}/; find the latest.
-    RESULT_DIR=$(ls -td results/*/*/ 2>/dev/null | head -1)
+    RESULT_DIR=$(find results -maxdepth 3 -name "result.json" -newer "$_TS" \
+                   -exec dirname {} \; 2>/dev/null | head -1)
+    rm -f "$_TS"
     [[ -n "$RESULT_DIR" && -f "$RESULT_DIR/result.json" ]] \
-        || error "Could not locate result directory after planning $ENV"
+        || error "Could not locate result directory after planning $ENV — did the planner succeed?"
     info "Result written to $RESULT_DIR"
 
     # --- Verify segment_cost >= 2 ---

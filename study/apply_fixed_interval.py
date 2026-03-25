@@ -26,13 +26,16 @@ def apply_fixed_interval(result: dict, k: int) -> dict:
     n_optimal = result["metrics"].get("segment_cost", 1)
     n_slices = n_optimal + k
 
+    # Use global T_max so all agents share the same interval boundaries.
+    T_max = max(len(p) for p in result["plans"].values())
+    slice_width = T_max / n_slices
+
     new_plans = {}
     for agent, path in result["plans"].items():
-        n = len(path)
         new_path = []
         for t, state in enumerate(path):
-            # Assign cost = which slice this timestep falls into (1-indexed).
-            cost = min(math.ceil((t + 1) / (n / n_slices)), n_slices)
+            # Assign cost = which global slice this timestep falls into (1-indexed).
+            cost = min(math.ceil((t + 1) / slice_width), n_slices)
             cost = max(cost, 1)
             new_state = dict(state)
             new_state["cost"] = cost

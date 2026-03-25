@@ -215,6 +215,13 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
     n_optimal = result["metrics"].get("segment_cost", 1)
     n_slices = n_optimal + k
 
+    # Global T_max: all agents use the same time-slice boundaries.
+    T_max = max(len(p) for p in plans.values())
+    global_boundaries = [
+        min(round((s + 1) * T_max / n_slices), T_max - 1)
+        for s in range(n_slices - 1)
+    ]
+
     legend_handles = []
 
     for i, (agent_name, path) in enumerate(plans.items()):
@@ -234,11 +241,8 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
         ax.add_collection(lc)
 
         # --- Time-slice dot markers ---
-        # Place dots at the boundary of each time slice (same cuts as Condition B).
-        slice_indices = [
-            min(round((s + 1) * n / n_slices), n - 1)
-            for s in range(n_slices - 1)
-        ]
+        # Same global timestep boundaries as Condition B; clamp to this agent's path.
+        slice_indices = [min(t, n - 1) for t in global_boundaries]
         for idx in slice_indices:
             p = path[idx]
             ax.scatter(p["x"], p["y"],

@@ -1,31 +1,27 @@
 map:
-  dimensions: [9, 9]
-  # Single vertical wall at x=4 with gap at (4,4).
-  # NOTE: the cross-wall design was broken — all 4 neighbors of the gap cell
-  # became obstacles, making the grid unsolvable. Single wall avoids this.
-  # All 4 agents cross from one side to the other → all visit (4,4) → segment_cost >= 4.
-  # (4,9) seals the boundary row (planner allows y=9 via off-by-one).
+  dimensions: [9, 5]
+  # Vertical wall at x=4 with a single gap at (4,2).
+  # All 4 agents start on the left (x=0) and goal on the right (x=8).
+  # Every agent must cross x=4 through (4,2) → all paths share (4,2) → segment_cost >= 4.
+  # No swaps: no agent's start equals another's goal.
+  # [4,5] seals the off-by-one boundary row (planner allows y=5 via bounds check).
   obstacles:
     - [4, 0]
     - [4, 1]
-    - [4, 2]
     - [4, 3]
-    - [4, 5]
-    - [4, 6]
-    - [4, 7]
-    - [4, 8]
-    - [4, 9]   # seals boundary row
+    - [4, 4]
+    - [4, 5]   # boundary seal
 
 agents:
   - name: "agent0"
     start: [0, 0]
-    goal:  [8, 8]
+    goal:  [8, 4]
   - name: "agent1"
-    start: [8, 8]
-    goal:  [0, 0]
+    start: [0, 1]
+    goal:  [8, 3]
   - name: "agent2"
-    start: [0, 8]
-    goal:  [8, 0]
+    start: [0, 3]
+    goal:  [8, 1]
   - name: "agent3"
-    start: [8, 0]
-    goal:  [0, 8]
+    start: [0, 4]
+    goal:  [8, 0]
