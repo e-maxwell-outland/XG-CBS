@@ -1,26 +1,38 @@
 map:
   dimensions: [7, 5]
-  # Horizontal wall at y=2 with a single gap at (3,2).
-  # All 3 agents start at the top (y=4) and goal at the bottom (y=0).
-  # Every agent must cross y=2 through (3,2) → all paths share (3,2) → segment_cost >= 3.
-  # No swaps: no agent's start equals another's goal.
-  # [7,2] seals the off-by-one boundary column (planner allows x=7 via bounds check).
+  # Horizontal wall at y=2 with single gap at (3,2).
+  # 3 agents travel top→bottom; each agent's start_x == goal_x so no horizontal
+  # crossing is needed — agents just queue through the bottleneck (3,2).
+  # All 3 must visit (3,2) → segment_cost >= 3.
+  # Full boundary seal: entire y=5 phantom row + x=7 phantom column.
   obstacles:
-    - [0, 2]
+    - [0, 2]   # wall
     - [1, 2]
     - [2, 2]
-    - [4, 2]
+    - [4, 2]   # wall continues (gap at x=3)
     - [5, 2]
     - [6, 2]
-    - [7, 2]   # boundary seal
+    - [0, 5]   # y=5 phantom row
+    - [1, 5]
+    - [2, 5]
+    - [3, 5]
+    - [4, 5]
+    - [5, 5]
+    - [6, 5]
+    - [7, 5]
+    - [7, 0]   # x=7 phantom column
+    - [7, 1]
+    - [7, 2]
+    - [7, 3]
+    - [7, 4]
 
 agents:
   - name: "agent0"
-    start: [0, 4]
-    goal:  [6, 0]
+    start: [1, 4]
+    goal:  [1, 0]
   - name: "agent1"
     start: [3, 4]
     goal:  [3, 0]
   - name: "agent2"
-    start: [6, 4]
-    goal:  [0, 0]
+    start: [5, 4]
+    goal:  [5, 0]
