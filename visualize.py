@@ -234,11 +234,14 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
         ax.add_collection(lc)
 
         # --- Time-slice dot markers ---
-        # Place dots at the boundary of each time slice (same cuts as Condition B).
-        slice_indices = [
-            min(round((s + 1) * n / n_slices), n - 1)
+        # Use global T_max so all agents share the same absolute timestep
+        # boundaries (consistent with Condition B's global slicing).
+        T_max = max(len(p) for p in plans.values())
+        global_cuts = [
+            round((s + 1) * T_max / n_slices)
             for s in range(n_slices - 1)
         ]
+        slice_indices = [min(g, n - 1) for g in global_cuts]
         for idx in slice_indices:
             p = path[idx]
             ax.scatter(p["x"], p["y"],
