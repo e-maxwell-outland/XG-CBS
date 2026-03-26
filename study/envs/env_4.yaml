@@ -1,9 +1,10 @@
 map:
-  dimensions: [6, 3]
-  # S-curve double wall (compressed to 3 rows).
+  dimensions: [7, 3]
+  # S-curve double wall. Extra column added after wall 2 for maneuvering room.
   # Wall 1 at x=2: gap at top (y=2). Wall 2 at x=4: gap at bottom (y=0).
   # All agents zig-zag: climb to (2,2), descend to (4,0) → S-curve paths.
-  # Full boundary seal: y=3 phantom row + x=6 phantom column.
+  # Goals at x=6 give agents 2 cells to spread after crossing wall 2.
+  # Full boundary seal: y=3 phantom row + x=7 phantom column.
   obstacles:
     - [2, 0]   # wall 1 (gap at y=2)
     - [2, 1]
@@ -16,17 +17,18 @@ map:
     - [4, 3]
     - [5, 3]
     - [6, 3]
-    - [6, 0]   # x=6 phantom column
-    - [6, 1]
-    - [6, 2]
+    - [7, 3]
+    - [7, 0]   # x=7 phantom column
+    - [7, 1]
+    - [7, 2]
 
 agents:
   - name: "agent0"
     start: [0, 0]
-    goal:  [5, 2]
+    goal:  [6, 2]
   - name: "agent1"
     start: [0, 1]
-    goal:  [5, 1]
+    goal:  [6, 1]
   - name: "agent2"
     start: [0, 2]
-    goal:  [5, 0]
+    goal:  [6, 0]
