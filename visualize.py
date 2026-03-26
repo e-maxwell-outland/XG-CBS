@@ -215,10 +215,7 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
 
     _draw_grid(ax, nx, ny, obstacles)
 
-    n_optimal = result["metrics"].get("segment_cost", 1)
-    n_slices = n_optimal + k
     T_max = max(len(p) for p in plans.values())
-    global_cuts = [round((s + 1) * T_max / n_slices) for s in range(n_slices - 1)]
 
     # Small fixed per-agent dot offset so markers on shared cells don't stack.
     # Each agent's dots (and labels) are nudged to a unique spot within the tile;
@@ -233,68 +230,29 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
         for i in range(n_agents)
     ]
 
-    # Greedy label placement: track occupied positions in data coords.
-    _MIN_SEP = 0.45  # minimum label separation (data coords)
-    _LABEL_OFFSETS = [  # candidate (dx, dy) in data coords, tried in order
-        ( 0.22,  0.22), (-0.22,  0.22), ( 0.22, -0.22), (-0.22, -0.22),
-        ( 0.38,  0.05), (-0.38,  0.05), ( 0.05,  0.38), ( 0.05, -0.38),
-        ( 0.40,  0.22), (-0.40,  0.22), ( 0.40, -0.22), (-0.40, -0.22),
-    ]
-    placed_labels = []  # [(cx, cy), ...] in data coords
-
     legend_handles = []
 
     for i, (agent_name, path) in enumerate(plans.items()):
         cmap = plt.get_cmap(_AGENT_CMAPS[i % len(_AGENT_CMAPS)])
         dark_color = cmap(0.85)
-        n = len(path)
 
         coords = np.array([[p["x"], p["y"]] for p in path], dtype=float)
         ddx, ddy = _dot_offsets[i]
         off_coords = coords + np.array([ddx, ddy])
 
-        # --- Gradient line via LineCollection (offset coords) ---
+        # --- Gradient line via LineCollection ---
+        # Colour is mapped to global time (T_max) so the same shade means the
+        # same moment across all agents.  A shorter path only reaches partway
+        # through the gradient, reflecting that it finished earlier.
         points = off_coords.reshape(-1, 1, 2)
         segs = np.concatenate([points[:-1], points[1:]], axis=1)
-        n_segs = len(segs)
-        seg_colors = [cmap(0.35 + 0.60 * t / max(n_segs - 1, 1))
-                      for t in range(n_segs)]
+        seg_colors = [cmap(0.35 + 0.60 * t / max(T_max - 1, 1))
+                      for t in range(len(segs))]
         lc = mcollections.LineCollection(segs, colors=seg_colors,
                                          linewidth=2.5, zorder=3)
         ax.add_collection(lc)
 
-        # --- Time-slice dots (offset within tile) + non-overlapping labels ---
-        slice_indices = [min(g, n - 1) for g in global_cuts]
-        for idx in slice_indices:
-            ox, oy = off_coords[idx]
-            ax.scatter(ox, oy, s=90, c="white", zorder=6,
-                       edgecolors=dark_color, linewidths=1.8)
-
-            # Find first candidate position that doesn't clash
-            chosen = None
-            for dx, dy in _LABEL_OFFSETS:
-                cx, cy = ox + dx, oy + dy
-                if all(abs(cx - pl[0]) > _MIN_SEP or abs(cy - pl[1]) > _MIN_SEP
-                       for pl in placed_labels):
-                    chosen = (cx, cy)
-                    break
-            if chosen is None:
-                chosen = (ox + _LABEL_OFFSETS[0][0], oy + _LABEL_OFFSETS[0][1])
-            placed_labels.append(chosen)
-
-            ax.annotate(
-                f"t={idx}",
-                xy=(ox, oy),
-                xytext=chosen,
-                textcoords="data",
-                fontsize=6.5,
-                color=dark_color,
-                arrowprops=dict(arrowstyle="-", color=dark_color,
-                                lw=0.6, alpha=0.5),
-                zorder=7,
-            )
-
-        # --- Start / goal markers (offset within tile) ---
+        # --- Start / goal markers ---
         if show_start_goal and agent_name in agents_cfg:
             ax.scatter([off_coords[0][0]], [off_coords[0][1]],
                        marker="o", s=180, color=dark_color,
