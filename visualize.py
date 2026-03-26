@@ -124,8 +124,7 @@ def visualize_segments(env: dict, result: dict, segment_cost: int,
 
     Args:
         segment_label_fmt: format string with {i} (1-based) and {n} (total).
-            Default  → "Segment 1 of N"
-            Condition B override → "Time interval {i} of {n}"
+            Default → "Segment {i} of {n}"
     """
     dims = env["map"]["dimensions"]
     nx, ny = dims[0], dims[1]
@@ -352,7 +351,7 @@ def main():
         segment_cost = result["metrics"].get("segment_cost", 1)
         fig = visualize_segments(
             env, result, segment_cost,
-            segment_label_fmt="Time interval {i} of {n}",
+            segment_label_fmt="Segment {i} of {n}",
         )
     elif args.segments:
         segment_cost = result["metrics"].get("segment_cost", 1)
