@@ -11,7 +11,13 @@
       "Bash(python3 .claude/worktrees/thirsty-fermi/study/apply_fixed_interval.py results/3-24/exp-0/ --k 2 -o /tmp/test_b/)",
       "Bash(python3 .claude/worktrees/thirsty-fermi/visualize.py /tmp/test_b/ --condition-b -o /tmp/test_condition_b.png)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(python3 study/apply_fixed_interval.py results/3-25/exp-3 --k 2 -o /tmp/test_b)",
+      "Bash(python3 visualize.py results/3-25/exp-3 --condition-a --k 2 -o /tmp/test_cond_a.png)",
+      "Bash(python3 visualize.py /tmp/test_b --condition-b -o /tmp/test_cond_b.png)",
+      "Bash(python3 visualize.py results/3-25/exp-3 --segments -o /tmp/test_cond_c.png)",
+      "Bash(python3 -:*)",
+      "Bash(git push:*)"
     ]
   }
 }

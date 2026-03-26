@@ -1,43 +1,36 @@
 map:
-  dimensions: [9, 6]
-  # Horizontal wall at y=3 with single gap at (4,3).
-  # 3 agents travel top→bottom; start_x == goal_x so no horizontal crossing needed.
-  # Agent1 at x=4 goes straight through the gap; agents 0,2 make small detours.
-  # All 3 must visit (4,3) → segment_cost >= 3.
-  # Full boundary seal: entire y=6 phantom row + x=9 phantom column.
+  dimensions: [11, 3]
+  # Wide, short grid. Vertical wall at x=5 with gap at (5,1).
+  # 3 agents, fan pattern: agent0 crosses from bottom-left to top-right,
+  # agent2 from top-left to bottom-right — paths visually cross after the wall.
+  # All must visit (5,1) → segment_cost >= 3.
+  # Full boundary seal: entire y=3 phantom row + x=11 phantom column.
   obstacles:
-    - [0, 3]   # wall
+    - [5, 0]   # wall (gap at y=1)
+    - [5, 2]
+    - [0, 3]   # y=3 phantom row
     - [1, 3]
     - [2, 3]
     - [3, 3]
-    - [5, 3]   # wall continues (gap at x=4)
+    - [4, 3]
+    - [5, 3]
     - [6, 3]
     - [7, 3]
     - [8, 3]
-    - [0, 6]   # y=6 phantom row
-    - [1, 6]
-    - [2, 6]
-    - [3, 6]
-    - [4, 6]
-    - [5, 6]
-    - [6, 6]
-    - [7, 6]
-    - [8, 6]
-    - [9, 6]
-    - [9, 0]   # x=9 phantom column
-    - [9, 1]
-    - [9, 2]
     - [9, 3]
-    - [9, 4]
-    - [9, 5]
+    - [10, 3]
+    - [11, 3]
+    - [11, 0]  # x=11 phantom column
+    - [11, 1]
+    - [11, 2]
 
 agents:
   - name: "agent0"
-    start: [2, 5]
-    goal:  [2, 0]
+    start: [0, 0]
+    goal:  [10, 2]
   - name: "agent1"
-    start: [4, 5]
-    goal:  [4, 0]
+    start: [0, 1]
+    goal:  [10, 1]
   - name: "agent2"
-    start: [6, 5]
-    goal:  [6, 0]
+    start: [0, 2]
+    goal:  [10, 0]

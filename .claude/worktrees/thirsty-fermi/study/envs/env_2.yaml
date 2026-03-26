@@ -1,18 +1,48 @@
 map:
-  dimensions: [9, 5]
-  # Open grid — agents 0&1 travel the same horizontal row in opposite directions
-  # (guaranteed full overlap). Agents 2&3 cross perpendicularly.
+  dimensions: [4, 8]
+  # Two-lane highway: x=0 and x=3 are solid walls, leaving lanes x=1 (left) and x=2 (right).
+  # Agent A travels down the left lane. Agents B and C travel up the right lane,
+  # but B starts behind C and must pass C to reach its further goal.
+  # Full boundary seal: y=8 phantom row + x=4 phantom column.
+  # Note: x=0 and x=3 walls double as left/right boundary seals.
+  obstacles:
+    - [0, 0]   # left wall (x=0, all rows)
+    - [0, 1]
+    - [0, 2]
+    - [0, 3]
+    - [0, 4]
+    - [0, 5]
+    - [0, 6]
+    - [0, 7]
+    - [3, 0]   # right wall (x=3, all rows)
+    - [3, 1]
+    - [3, 2]
+    - [3, 3]
+    - [3, 4]
+    - [3, 5]
+    - [3, 6]
+    - [3, 7]
+    - [0, 8]   # y=8 phantom row
+    - [1, 8]
+    - [2, 8]
+    - [3, 8]
+    - [4, 8]
+    - [4, 0]   # x=4 phantom column
+    - [4, 1]
+    - [4, 2]
+    - [4, 3]
+    - [4, 4]
+    - [4, 5]
+    - [4, 6]
+    - [4, 7]
 
 agents:
   - name: "agent0"
-    start: [0, 2]
-    goal:  [8, 2]
+    start: [1, 7]
+    goal:  [1, 0]
   - name: "agent1"
-    start: [8, 2]
-    goal:  [0, 2]
+    start: [2, 0]
+    goal:  [2, 7]
   - name: "agent2"
-    start: [4, 4]
-    goal:  [4, 0]
-  - name: "agent3"
-    start: [2, 4]
-    goal:  [6, 0]
+    start: [2, 1]
+    goal:  [2, 6]
