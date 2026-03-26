@@ -251,9 +251,10 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
 
         coords = np.array([[p["x"], p["y"]] for p in path], dtype=float)
         ddx, ddy = _dot_offsets[i]
+        off_coords = coords + np.array([ddx, ddy])
 
-        # --- Gradient line via LineCollection (true grid coords) ---
-        points = coords.reshape(-1, 1, 2)
+        # --- Gradient line via LineCollection (offset coords) ---
+        points = off_coords.reshape(-1, 1, 2)
         segs = np.concatenate([points[:-1], points[1:]], axis=1)
         n_segs = len(segs)
         seg_colors = [cmap(0.35 + 0.60 * t / max(n_segs - 1, 1))
@@ -265,8 +266,7 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
         # --- Time-slice dots (offset within tile) + non-overlapping labels ---
         slice_indices = [min(g, n - 1) for g in global_cuts]
         for idx in slice_indices:
-            ox = coords[idx][0] + ddx
-            oy = coords[idx][1] + ddy
+            ox, oy = off_coords[idx]
             ax.scatter(ox, oy, s=90, c="white", zorder=6,
                        edgecolors=dark_color, linewidths=1.8)
 
@@ -296,10 +296,10 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
 
         # --- Start / goal markers (offset within tile) ---
         if show_start_goal and agent_name in agents_cfg:
-            ax.scatter([coords[0][0] + ddx], [coords[0][1] + ddy],
+            ax.scatter([off_coords[0][0]], [off_coords[0][1]],
                        marker="o", s=180, color=dark_color,
                        edgecolors="black", linewidths=1.5, zorder=5)
-            ax.scatter([coords[-1][0] + ddx], [coords[-1][1] + ddy],
+            ax.scatter([off_coords[-1][0]], [off_coords[-1][1]],
                        marker="*", s=320, color=dark_color,
                        edgecolors="black", linewidths=1, zorder=5)
 
