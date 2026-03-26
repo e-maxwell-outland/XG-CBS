@@ -188,29 +188,6 @@ def visualize_segments(env: dict, result: dict, segment_cost: int,
     return fig
 
 
-def _perp_offset_path(coords: np.ndarray, dist: float) -> np.ndarray:
-    """Offset a path laterally (perpendicular to travel direction) by dist cells."""
-    n = len(coords)
-    result = coords.astype(float).copy()
-    if n < 2 or dist == 0:
-        return result
-    perps = np.zeros((n, 2))
-    for i in range(n):
-        if i == 0:
-            delta = coords[1] - coords[0]
-        elif i == n - 1:
-            delta = coords[-1] - coords[-2]
-        else:
-            delta = coords[i + 1] - coords[i - 1]
-        ln = np.linalg.norm(delta)
-        if ln > 1e-9:
-            d = delta / ln
-            perps[i] = np.array([-d[1], d[0]])
-        elif i > 0:
-            perps[i] = perps[i - 1]
-    return result + perps * dist
-
-
 def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
                           show_start_goal: bool = True):
     """Condition A: full geometric paths with per-agent color gradient + time dots.
@@ -243,11 +220,18 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
     T_max = max(len(p) for p in plans.values())
     global_cuts = [round((s + 1) * T_max / n_slices) for s in range(n_slices - 1)]
 
-    # Lateral offset per agent so coincident paths don't fully overlap.
+    # Small fixed per-agent dot offset so markers on shared cells don't stack.
+    # Each agent's dots (and labels) are nudged to a unique spot within the tile;
+    # the line itself is drawn on the true grid coordinates.
     n_agents = len(plans)
-    _LANE_OFFSET = 0.07  # cells
-    agent_lane_offsets = [(i - (n_agents - 1) / 2) * _LANE_OFFSET
-                          for i in range(n_agents)]
+    _DOT_RADIUS = 0.12  # cells — how far from tile centre each dot sits
+    _dot_offsets = [
+        (
+            _DOT_RADIUS * np.cos(2 * np.pi * i / n_agents),
+            _DOT_RADIUS * np.sin(2 * np.pi * i / n_agents),
+        )
+        for i in range(n_agents)
+    ]
 
     # Greedy label placement: track occupied positions in data coords.
     _MIN_SEP = 0.45  # minimum label separation (data coords)
@@ -266,10 +250,10 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
         n = len(path)
 
         coords = np.array([[p["x"], p["y"]] for p in path], dtype=float)
-        off_coords = _perp_offset_path(coords, agent_lane_offsets[i])
+        ddx, ddy = _dot_offsets[i]
 
-        # --- Gradient line via LineCollection (on offset coords) ---
-        points = off_coords.reshape(-1, 1, 2)
+        # --- Gradient line via LineCollection (true grid coords) ---
+        points = coords.reshape(-1, 1, 2)
         segs = np.concatenate([points[:-1], points[1:]], axis=1)
         n_segs = len(segs)
         seg_colors = [cmap(0.35 + 0.60 * t / max(n_segs - 1, 1))
@@ -278,10 +262,11 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
                                          linewidth=2.5, zorder=3)
         ax.add_collection(lc)
 
-        # --- Time-slice dots + non-overlapping labels ---
+        # --- Time-slice dots (offset within tile) + non-overlapping labels ---
         slice_indices = [min(g, n - 1) for g in global_cuts]
         for idx in slice_indices:
-            ox, oy = off_coords[idx]
+            ox = coords[idx][0] + ddx
+            oy = coords[idx][1] + ddy
             ax.scatter(ox, oy, s=90, c="white", zorder=6,
                        edgecolors=dark_color, linewidths=1.8)
 
@@ -309,12 +294,12 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
                 zorder=7,
             )
 
-        # --- Start / goal markers (on offset coords) ---
+        # --- Start / goal markers (offset within tile) ---
         if show_start_goal and agent_name in agents_cfg:
-            ax.scatter([off_coords[0][0]], [off_coords[0][1]],
+            ax.scatter([coords[0][0] + ddx], [coords[0][1] + ddy],
                        marker="o", s=180, color=dark_color,
                        edgecolors="black", linewidths=1.5, zorder=5)
-            ax.scatter([off_coords[-1][0]], [off_coords[-1][1]],
+            ax.scatter([coords[-1][0] + ddx], [coords[-1][1] + ddy],
                        marker="*", s=320, color=dark_color,
                        edgecolors="black", linewidths=1, zorder=5)
 
