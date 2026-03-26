@@ -221,7 +221,7 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
     # Each agent's dots (and labels) are nudged to a unique spot within the tile;
     # the line itself is drawn on the true grid coordinates.
     n_agents = len(plans)
-    _DOT_RADIUS = 0.12  # cells — how far from tile centre each dot sits
+    _DOT_RADIUS = 0.035  # cells — just enough to separate 2.5pt lines; nearly touching
     _dot_offsets = [
         (
             _DOT_RADIUS * np.cos(2 * np.pi * i / n_agents),
