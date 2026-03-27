@@ -7,14 +7,18 @@
 # Prerequisites:
 #   - ./build/Planner binary must exist  (run ./run.sh to build)
 #   - Python 3 with matplotlib, numpy, pyyaml  (pip install -r requirements.txt)
-#   - ffmpeg  (installed in the Docker container; apt-get install ffmpeg otherwise)
+#   - ffmpeg  (installed in the Docker container; apt-get update && apt-get install -y ffmpeg)
+#
+# Design: only XG-CBS is run. The "random" condition reuses the same XG-CBS
+# trajectories but re-slices them into ceil(N × SEG_FACTOR) time-based segments,
+# isolating segmentation count as the sole variable between conditions.
 #
 # Outputs (all under study/):
-#   figures/trajectories/env_N.mp4         — animated agent trajectories (from CBS paths)
-#   figures/cbs_segments/env_N/seg_K.png   — individual segment images, CBS  ("random")
-#   figures/xgcbs_segments/env_N/seg_K.png — individual segment images, XG-CBS ("optimized")
-#   results/cbs/env_N/{result.json,env.yaml}
-#   results/xgcbs/env_N/{result.json,env.yaml}
+#   figures/trajectories/env_N.mp4            — animated agent trajectories
+#   figures/random_segments/env_N/seg_K.png   — re-sliced segments ("random")
+#   figures/optimal_segments/env_N/seg_K.png  — XG-CBS segments ("optimized")
+#   results/optimal/env_N/{result.json,env.yaml}
+#   results/random/env_N/{result.json,env.yaml}
 #
 # Override any parameter via environment variable, e.g.:
 #   AGENTS=20 TIME_LIMIT=600 bash study/generate_stimuli.sh
@@ -24,7 +28,7 @@ AGENTS=${AGENTS:-16}
 OBSTACLES=${OBSTACLES:-0.15}
 COST_BOUND=${COST_BOUND:-8}     # XG-CBS explanation cost bound
 TIME_LIMIT=${TIME_LIMIT:-300.0} # planner time limit per environment (seconds)
-SEG_FACTOR=${SEG_FACTOR:-2.0}   # CBS segments = ceil(XG-CBS segments × factor)
+SEG_FACTOR=${SEG_FACTOR:-2.0}   # random segments = ceil(optimal segments × factor)
 
 PLANNER_BIN=./build/Planner
 STUDY_DIR=study
@@ -43,16 +47,16 @@ error() { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 python3 -c "import matplotlib, numpy, yaml" 2>/dev/null \
     || error "Python dependencies missing. Run: pip install -r requirements.txt"
 ffmpeg -version &>/dev/null \
-    || error "ffmpeg not found. Install with: apt-get install ffmpeg"
+    || error "ffmpeg not found. Install with: apt-get update && apt-get install -y ffmpeg"
 
 # ── Output directories ────────────────────────────────────────────────────────
 mkdir -p \
     "$STUDY_DIR/envs" \
-    "$STUDY_DIR/results/cbs" \
-    "$STUDY_DIR/results/xgcbs" \
+    "$STUDY_DIR/results/optimal" \
+    "$STUDY_DIR/results/random" \
     "$STUDY_DIR/figures/trajectories" \
-    "$STUDY_DIR/figures/cbs_segments" \
-    "$STUDY_DIR/figures/xgcbs_segments"
+    "$STUDY_DIR/figures/optimal_segments" \
+    "$STUDY_DIR/figures/random_segments"
 
 # ── Helper: find the newest result.json written since a timestamp file ────────
 newest_result() {
@@ -77,25 +81,7 @@ for N in 1 2 3 4 5; do
         --agents "$AGENTS" --obstacles "$OBSTACLES" \
         --seed "$N" -o "$ENV_YAML"
 
-    # ── 2. Run CBS baseline ───────────────────────────────────────────────────
-    info "Running CBS on $ENV_NAME…"
-    _TS=$(mktemp)
-    timeout "${TIME_LIMIT%.*}" \
-        $PLANNER_BIN Plan "$ENV_YAML" CBS A "$TIME_LIMIT" 2>&1 | tail -5 || true
-    CBS_RAW=$(newest_result "$_TS")
-    rm -f "$_TS"
-    if [[ -z "$CBS_RAW" ]]; then
-        warn "CBS failed or timed out for $ENV_NAME — skipping."
-        FAILED+=("$ENV_NAME (CBS planning failed — try a different seed or larger TIME_LIMIT)")
-        continue
-    fi
-
-    # Copy to stable study location
-    CBS_RESULT="$STUDY_DIR/results/cbs/$ENV_NAME"
-    mkdir -p "$CBS_RESULT"
-    cp "$CBS_RAW/result.json" "$CBS_RAW/env.yaml" "$CBS_RESULT/"
-
-    # ── 3. Run XG-CBS with SR-A* ──────────────────────────────────────────────
+    # ── 2. Run XG-CBS (SR-A*) — the one and only planner call ────────────────
     info "Running XG-CBS (SR-A*) on $ENV_NAME…"
     _TS=$(mktemp)
     timeout "${TIME_LIMIT%.*}" \
@@ -104,45 +90,43 @@ for N in 1 2 3 4 5; do
     rm -f "$_TS"
     if [[ -z "$XG_RAW" ]]; then
         warn "XG-CBS failed or timed out for $ENV_NAME — skipping."
-        FAILED+=("$ENV_NAME (XG-CBS planning failed — try raising TIME_LIMIT or COST_BOUND)")
+        FAILED+=("$ENV_NAME (XG-CBS failed — try raising TIME_LIMIT or COST_BOUND)")
         continue
     fi
 
-    XGCBS_RESULT="$STUDY_DIR/results/xgcbs/$ENV_NAME"
-    mkdir -p "$XGCBS_RESULT"
-    cp "$XG_RAW/result.json" "$XG_RAW/env.yaml" "$XGCBS_RESULT/"
+    # Stable result locations
+    OPT_RESULT="$STUDY_DIR/results/optimal/$ENV_NAME"
+    RND_RESULT="$STUDY_DIR/results/random/$ENV_NAME"
+    mkdir -p "$OPT_RESULT" "$RND_RESULT"
+    cp "$XG_RAW/result.json" "$XG_RAW/env.yaml" "$OPT_RESULT/"
 
-    # Read raw segment counts
-    CBS_SEG_RAW=$(python3 -c "
+    # ── 3. Build "random" condition: same paths, more segments ────────────────
+    # Copy XG-CBS result then re-label cost fields to create ceil(N×factor) segs.
+    cp "$OPT_RESULT/result.json" "$OPT_RESULT/env.yaml" "$RND_RESULT/"
+
+    OPT_SEG=$(python3 -c "
 import json
-d = json.load(open('$CBS_RESULT/result.json'))
-print(d['metrics']['segment_cost'])")
-    XG_SEG=$(python3 -c "
-import json
-d = json.load(open('$XGCBS_RESULT/result.json'))
+d = json.load(open('$OPT_RESULT/result.json'))
 print(d['metrics']['segment_cost'])")
 
-    # Re-label CBS cost fields so it always has ceil(XG_SEG × SEG_FACTOR) segments.
-    # CBS uses the "disappearing" model, so its native segment count is meaningless
-    # as a study condition — we impose a fixed ratio instead.
-    CBS_SEG=$(python3 - "$CBS_RESULT/result.json" "$XG_SEG" "$SEG_FACTOR" <<'PYEOF'
+    RND_SEG=$(python3 - "$RND_RESULT/result.json" "$OPT_SEG" "$SEG_FACTOR" <<'PYEOF'
 import json, math, sys
 
 result_file = sys.argv[1]
-xg_seg      = int(sys.argv[2])
-factor      = float(sys.argv[3])
+opt_seg      = int(sys.argv[2])
+factor       = float(sys.argv[3])
 
 d = json.load(open(result_file))
 
-target_desired = max(xg_seg + 1, math.ceil(xg_seg * factor))
+target_desired = max(opt_seg + 1, math.ceil(opt_seg * factor))
 # Cannot have more segments than the shortest path (each segment needs ≥1 step)
 min_len = min(len(p) for p in d["plans"].values())
 target  = min(target_desired, min_len)
 
-if target <= xg_seg:
-    print(f"WARNING: shortest CBS path ({min_len} steps) prevents reaching "
-          f"{target_desired} segments — using {target} (same as or close to XG-CBS={xg_seg}). "
-          f"Consider a larger map or more obstacles.", file=sys.stderr)
+if target <= opt_seg:
+    print(f"WARNING: shortest path ({min_len} steps) limits random condition to "
+          f"{target} segments instead of {target_desired}. "
+          f"Consider a larger map or fewer obstacles.", file=sys.stderr)
 
 for path in d["plans"].values():
     L = len(path)
@@ -158,22 +142,23 @@ with open(result_file, "w") as f:
 print(target)
 PYEOF
 )
-    info "$ENV_NAME: CBS segments=$CBS_SEG_RAW → re-labelled=$CBS_SEG  |  XG-CBS segments=$XG_SEG"
 
-    # ── 4. Trajectory video (animated MP4 from CBS paths) ─────────────────────
+    info "$ENV_NAME: optimal=$OPT_SEG segments  |  random=$RND_SEG segments"
+
+    # ── 4. Trajectory video (from XG-CBS paths) ───────────────────────────────
     info "Generating trajectory video…"
-    python3 visualize.py "$CBS_RESULT" \
+    python3 visualize.py "$OPT_RESULT" \
         --animate -o "$STUDY_DIR/figures/trajectories/${ENV_NAME}.mp4"
 
-    # ── 5. Individual segment PNGs — CBS ("random" segmentation) ─────────────
-    info "Generating CBS segment images ($CBS_SEG segments)…"
-    python3 visualize.py "$CBS_RESULT" \
-        --segments-dir "$STUDY_DIR/figures/cbs_segments/$ENV_NAME"
+    # ── 5. Segment PNGs — "optimized" condition ───────────────────────────────
+    info "Generating optimal segment images ($OPT_SEG segments)…"
+    python3 visualize.py "$OPT_RESULT" \
+        --segments-dir "$STUDY_DIR/figures/optimal_segments/$ENV_NAME"
 
-    # ── 6. Individual segment PNGs — XG-CBS ("optimized" segmentation) ────────
-    info "Generating XG-CBS segment images ($XG_SEG segments)…"
-    python3 visualize.py "$XGCBS_RESULT" \
-        --segments-dir "$STUDY_DIR/figures/xgcbs_segments/$ENV_NAME"
+    # ── 6. Segment PNGs — "random" condition (same paths, more segments) ──────
+    info "Generating random segment images ($RND_SEG segments)…"
+    python3 visualize.py "$RND_RESULT" \
+        --segments-dir "$STUDY_DIR/figures/random_segments/$ENV_NAME"
 
     info "$ENV_NAME complete."
     echo
@@ -184,11 +169,11 @@ echo "════════════════════════�
 if [[ ${#FAILED[@]} -eq 0 ]]; then
     info "All 5 environments completed successfully."
     info "Outputs under $STUDY_DIR/:"
-    info "  figures/trajectories/    — 5 MP4 trajectory videos"
-    info "  figures/cbs_segments/    — per-segment PNGs, CBS  (\"random\")"
-    info "  figures/xgcbs_segments/  — per-segment PNGs, XG-CBS (\"optimized\")"
-    info "  results/cbs/             — raw CBS planner output"
-    info "  results/xgcbs/           — raw XG-CBS planner output"
+    info "  figures/trajectories/      — 5 MP4 trajectory videos"
+    info "  figures/optimal_segments/  — per-segment PNGs, XG-CBS (\"optimized\")"
+    info "  figures/random_segments/   — per-segment PNGs, re-sliced (\"random\")"
+    info "  results/optimal/           — XG-CBS planner output"
+    info "  results/random/            — re-labelled copy for random condition"
 else
     warn "The following environments encountered errors:"
     for F in "${FAILED[@]}"; do
