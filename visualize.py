@@ -236,22 +236,23 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
                 ax.scatter(xs, ys, c=color, s=80, zorder=5,
                            edgecolors="white", linewidths=1.2)
 
-        # Start / goal markers
+        # Goal stars: visible only in segment 1 (reference) and the segment
+        # where the agent arrives (last segment of its path).
         for i, (agent_name, path) in enumerate(plans.items()):
             if agent_name not in agents_cfg:
                 continue
             color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
-            start = agents_cfg[agent_name]["start"]
             goal = agents_cfg[agent_name]["goal"]
 
             goal_in = any(
                 p["x"] == goal[0] and p["y"] == goal[1] and p["cost"] == cost_level
                 for p in path
             )
+            is_first_seg = (cost_level == 1)
 
-            ax.scatter([goal[0]], [goal[1]], marker="*", s=320, c=color,
-                       edgecolors="black", linewidths=1, zorder=6,
-                       alpha=1.0 if goal_in else 0.25)
+            if goal_in or is_first_seg:
+                ax.scatter([goal[0]], [goal[1]], marker="*", s=320, c=color,
+                           edgecolors="black", linewidths=1, zorder=6)
 
         plt.tight_layout()
 
