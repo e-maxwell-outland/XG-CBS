@@ -1,34 +1,194 @@
 map:
-  dimensions: [7, 4]
-  # S-curve double wall with open bypass row at y=0.
-  # Wall 1 at x=2: gap at top (y=3). Wall 2 at x=4: gap at y=1.
-  # y=0 row is fully open — second route past both walls for waiting/bypass.
-  # Full boundary seal: y=4 phantom row + x=7 phantom column.
+  dimensions:
+  - 16
+  - 16
   obstacles:
-    - [2, 1]   # wall 1 (gap at y=3)
-    - [2, 2]
-    - [4, 2]   # wall 2 (gap at y=1)
-    - [4, 3]
-    - [0, 4]   # y=4 phantom row
-    - [1, 4]
-    - [2, 4]
-    - [3, 4]
-    - [4, 4]
-    - [5, 4]
-    - [6, 4]
-    - [7, 4]
-    - [7, 0]   # x=7 phantom column
-    - [7, 1]
-    - [7, 2]
-    - [7, 3]
-
+  - - 1
+    - 1
+  - - 1
+    - 3
+  - - 1
+    - 15
+  - - 2
+    - 4
+  - - 3
+    - 4
+  - - 3
+    - 12
+  - - 3
+    - 13
+  - - 4
+    - 10
+  - - 4
+    - 13
+  - - 5
+    - 0
+  - - 5
+    - 4
+  - - 5
+    - 6
+  - - 5
+    - 8
+  - - 6
+    - 0
+  - - 6
+    - 3
+  - - 6
+    - 4
+  - - 6
+    - 6
+  - - 7
+    - 1
+  - - 7
+    - 2
+  - - 7
+    - 12
+  - - 8
+    - 3
+  - - 8
+    - 7
+  - - 8
+    - 11
+  - - 9
+    - 8
+  - - 10
+    - 1
+  - - 10
+    - 2
+  - - 10
+    - 4
+  - - 10
+    - 7
+  - - 10
+    - 14
+  - - 11
+    - 1
+  - - 12
+    - 2
+  - - 12
+    - 5
+  - - 12
+    - 8
+  - - 12
+    - 12
+  - - 13
+    - 4
+  - - 14
+    - 12
+  - - 15
+    - 0
+  - - 15
+    - 4
 agents:
-  - name: "agent0"
-    start: [0, 0]
-    goal:  [6, 3]
-  - name: "agent1"
-    start: [0, 1]
-    goal:  [6, 2]
-  - name: "agent2"
-    start: [0, 2]
-    goal:  [6, 0]
+- name: agent0
+  start:
+  - 15
+  - 5
+  goal:
+  - 9
+  - 10
+- name: agent1
+  start:
+  - 14
+  - 11
+  goal:
+  - 1
+  - 6
+- name: agent2
+  start:
+  - 15
+  - 13
+  goal:
+  - 1
+  - 0
+- name: agent3
+  start:
+  - 6
+  - 7
+  goal:
+  - 15
+  - 15
+- name: agent4
+  start:
+  - 13
+  - 1
+  goal:
+  - 15
+  - 10
+- name: agent5
+  start:
+  - 9
+  - 11
+  goal:
+  - 8
+  - 13
+- name: agent6
+  start:
+  - 13
+  - 6
+  goal:
+  - 4
+  - 6
+- name: agent7
+  start:
+  - 11
+  - 12
+  goal:
+  - 14
+  - 9
+- name: agent8
+  start:
+  - 12
+  - 7
+  goal:
+  - 14
+  - 3
+- name: agent9
+  start:
+  - 13
+  - 9
+  goal:
+  - 2
+  - 8
+- name: agent10
+  start:
+  - 3
+  - 5
+  goal:
+  - 6
+  - 8
+- name: agent11
+  start:
+  - 10
+  - 3
+  goal:
+  - 6
+  - 11
+- name: agent12
+  start:
+  - 5
+  - 15
+  goal:
+  - 14
+  - 5
+- name: agent13
+  start:
+  - 5
+  - 9
+  goal:
+  - 8
+  - 8
+- name: agent14
+  start:
+  - 11
+  - 5
+  goal:
+  - 15
+  - 8
+- name: agent15
+  start:
+  - 11
+  - 15
+  goal:
+  - 4
+  - 3
