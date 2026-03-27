@@ -22,10 +22,29 @@ _AGENT_CMAPS = [
     "Oranges", "YlOrBr", "PuRd", "Greys",
 ]
 
-# Shared discrete palette (same order across all visualisation modes)
+# Shared discrete palette — 20 visually distinct colors, same order everywhere.
+# Enough for 16+ agents without repeating.
 _AGENT_COLORS = [
-    "#377eb8", "#e41a1c", "#4daf4a", "#984ea3",
-    "#ff7f00", "#a65628", "#f781bf", "#999999",
+    "#377eb8",  # blue
+    "#e41a1c",  # red
+    "#4daf4a",  # green
+    "#984ea3",  # purple
+    "#ff7f00",  # orange
+    "#a65628",  # brown
+    "#f781bf",  # pink
+    "#999999",  # grey
+    "#e6ab02",  # gold
+    "#1b9e77",  # teal
+    "#d95f02",  # burnt orange
+    "#7570b3",  # slate purple
+    "#e7298a",  # hot pink
+    "#66a61e",  # olive green
+    "#e6194b",  # crimson
+    "#4363d8",  # cobalt
+    "#469990",  # dark cyan
+    "#9a6324",  # khaki brown
+    "#800000",  # maroon
+    "#808000",  # olive
 ]
 
 
@@ -256,45 +275,56 @@ def animate_trajectories(env: dict, result: dict, output_path: Path, fps: int = 
     agents_cfg = {a["name"]: a for a in env["agents"]}
     plans = result["plans"]
 
-    # Build position-by-timestep lookup; path is ordered by timestep (index = time)
+    # Path index = timestep (wait actions appear as repeated positions).
+    # CBS uses the "disappearing" model: agents vanish after reaching their goal,
+    # so we hide each agent (and its goal marker) once it arrives.
     T_max = max(len(path) - 1 for path in plans.values())
-    positions = {}
-    for agent_name, path in plans.items():
-        by_time = {t: (p["x"], p["y"]) for t, p in enumerate(path)}
-        # Agent stays at final position after its path ends
-        last = by_time[max(by_time)]
-        for t in range(T_max + 1):
-            if t not in by_time:
-                by_time[t] = last
-        positions[agent_name] = by_time
+    t_done = {name: len(path) - 1 for name, path in plans.items()}
+    positions = {
+        name: {t: (p["x"], p["y"]) for t, p in enumerate(path)}
+        for name, path in plans.items()
+    }
 
     fig, ax = plt.subplots(figsize=(8, 8))
     _draw_grid(ax, nx, ny, obstacles)
 
-    # Goal markers (static, slightly faded)
-    for i, (agent_name, _) in enumerate(plans.items()):
-        color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
-        if agent_name in agents_cfg:
-            g = agents_cfg[agent_name]["goal"]
-            ax.scatter([g[0]], [g[1]], marker="*", s=250, c=color,
-                       edgecolors="black", linewidths=1, zorder=3, alpha=0.45)
+    # All scatters start empty — update() populates / clears them each frame.
+    # This ensures blit doesn't preserve stale markers in the cached background.
+    _empty = np.empty((0, 2))
 
-    # Agent position markers (animated)
     agent_scatters = []
     for i, agent_name in enumerate(plans):
         color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
-        sc = ax.scatter([], [], c=color, s=220, zorder=6,
+        sc = ax.scatter([], [], color=color, s=220, zorder=6,
                         edgecolors="white", linewidths=1.8)
         agent_scatters.append((agent_name, sc))
+
+    goal_scatters = []
+    for i, (agent_name, _) in enumerate(plans.items()):
+        color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
+        sc = ax.scatter([], [], marker="*", color=color, s=300, zorder=3,
+                        edgecolors="black", linewidths=1, alpha=0.55)
+        goal_scatters.append((agent_name, sc))
 
     title = ax.set_title(f"Timestep 0 / {T_max}")
 
     def update(frame):
         for agent_name, sc in agent_scatters:
-            x, y = positions[agent_name][frame]
-            sc.set_offsets([[x, y]])
+            if frame <= t_done[agent_name]:
+                x, y = positions[agent_name][frame]
+                sc.set_offsets([[x, y]])
+            else:
+                sc.set_offsets(_empty)
+
+        for agent_name, sc in goal_scatters:
+            if frame <= t_done[agent_name] and agent_name in agents_cfg:
+                g = agents_cfg[agent_name]["goal"]
+                sc.set_offsets([[g[0], g[1]]])
+            else:
+                sc.set_offsets(_empty)
+
         title.set_text(f"Timestep {frame} / {T_max}")
-        return [sc for _, sc in agent_scatters] + [title]
+        return [sc for _, sc in agent_scatters] + [sc for _, sc in goal_scatters] + [title]
 
     ani = manim.FuncAnimation(
         fig, update, frames=T_max + 1,

@@ -24,6 +24,7 @@ AGENTS=${AGENTS:-16}
 OBSTACLES=${OBSTACLES:-0.15}
 COST_BOUND=${COST_BOUND:-8}     # XG-CBS explanation cost bound
 TIME_LIMIT=${TIME_LIMIT:-300.0} # planner time limit per environment (seconds)
+SEG_FACTOR=${SEG_FACTOR:-2.0}   # CBS segments = ceil(XG-CBS segments × factor)
 
 PLANNER_BIN=./build/Planner
 STUDY_DIR=study
@@ -79,12 +80,13 @@ for N in 1 2 3 4 5; do
     # ── 2. Run CBS baseline ───────────────────────────────────────────────────
     info "Running CBS on $ENV_NAME…"
     _TS=$(mktemp)
-    $PLANNER_BIN Plan "$ENV_YAML" CBS A "$TIME_LIMIT" 2>&1 | tail -5
+    timeout "${TIME_LIMIT%.*}" \
+        $PLANNER_BIN Plan "$ENV_YAML" CBS A "$TIME_LIMIT" 2>&1 | tail -5 || true
     CBS_RAW=$(newest_result "$_TS")
     rm -f "$_TS"
     if [[ -z "$CBS_RAW" ]]; then
-        warn "CBS failed for $ENV_NAME — skipping."
-        FAILED+=("$ENV_NAME (CBS planning failed)")
+        warn "CBS failed or timed out for $ENV_NAME — skipping."
+        FAILED+=("$ENV_NAME (CBS planning failed — try a different seed or larger TIME_LIMIT)")
         continue
     fi
 
@@ -96,11 +98,12 @@ for N in 1 2 3 4 5; do
     # ── 3. Run XG-CBS with SR-A* ──────────────────────────────────────────────
     info "Running XG-CBS (SR-A*) on $ENV_NAME…"
     _TS=$(mktemp)
-    $PLANNER_BIN Plan "$ENV_YAML" XG-CBS S-A "$TIME_LIMIT" "$COST_BOUND" 2>&1 | tail -5
+    timeout "${TIME_LIMIT%.*}" \
+        $PLANNER_BIN Plan "$ENV_YAML" XG-CBS S-A "$TIME_LIMIT" "$COST_BOUND" 2>&1 | tail -5 || true
     XG_RAW=$(newest_result "$_TS")
     rm -f "$_TS"
     if [[ -z "$XG_RAW" ]]; then
-        warn "XG-CBS failed for $ENV_NAME — skipping."
+        warn "XG-CBS failed or timed out for $ENV_NAME — skipping."
         FAILED+=("$ENV_NAME (XG-CBS planning failed — try raising TIME_LIMIT or COST_BOUND)")
         continue
     fi
@@ -109,8 +112,8 @@ for N in 1 2 3 4 5; do
     mkdir -p "$XGCBS_RESULT"
     cp "$XG_RAW/result.json" "$XG_RAW/env.yaml" "$XGCBS_RESULT/"
 
-    # Report segment counts
-    CBS_SEG=$(python3 -c "
+    # Read raw segment counts
+    CBS_SEG_RAW=$(python3 -c "
 import json
 d = json.load(open('$CBS_RESULT/result.json'))
 print(d['metrics']['segment_cost'])")
@@ -118,7 +121,44 @@ print(d['metrics']['segment_cost'])")
 import json
 d = json.load(open('$XGCBS_RESULT/result.json'))
 print(d['metrics']['segment_cost'])")
-    info "$ENV_NAME: CBS segments=$CBS_SEG  →  XG-CBS segments=$XG_SEG"
+
+    # Re-label CBS cost fields so it always has ceil(XG_SEG × SEG_FACTOR) segments.
+    # CBS uses the "disappearing" model, so its native segment count is meaningless
+    # as a study condition — we impose a fixed ratio instead.
+    CBS_SEG=$(python3 - "$CBS_RESULT/result.json" "$XG_SEG" "$SEG_FACTOR" <<'PYEOF'
+import json, math, sys
+
+result_file = sys.argv[1]
+xg_seg      = int(sys.argv[2])
+factor      = float(sys.argv[3])
+
+d = json.load(open(result_file))
+
+target_desired = max(xg_seg + 1, math.ceil(xg_seg * factor))
+# Cannot have more segments than the shortest path (each segment needs ≥1 step)
+min_len = min(len(p) for p in d["plans"].values())
+target  = min(target_desired, min_len)
+
+if target <= xg_seg:
+    print(f"WARNING: shortest CBS path ({min_len} steps) prevents reaching "
+          f"{target_desired} segments — using {target} (same as or close to XG-CBS={xg_seg}). "
+          f"Consider a larger map or more obstacles.", file=sys.stderr)
+
+for path in d["plans"].values():
+    L = len(path)
+    for i, step in enumerate(path):
+        # Linearly map index 0 → segment 1, index L-1 → segment target
+        step["cost"] = math.floor(i * (target - 1) / max(L - 1, 1)) + 1
+
+d["metrics"]["segment_cost"] = target
+
+with open(result_file, "w") as f:
+    json.dump(d, f)
+
+print(target)
+PYEOF
+)
+    info "$ENV_NAME: CBS segments=$CBS_SEG_RAW → re-labelled=$CBS_SEG  |  XG-CBS segments=$XG_SEG"
 
     # ── 4. Trajectory video (animated MP4 from CBS paths) ─────────────────────
     info "Generating trajectory video…"
