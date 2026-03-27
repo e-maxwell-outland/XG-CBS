@@ -118,21 +118,17 @@ factor       = float(sys.argv[3])
 
 d = json.load(open(result_file))
 
-target_desired = max(opt_seg + 1, math.ceil(opt_seg * factor))
-# Cannot have more segments than the shortest path (each segment needs ≥1 step)
-min_len = min(len(p) for p in d["plans"].values())
-target  = min(target_desired, min_len)
+target = max(opt_seg + 1, math.ceil(opt_seg * factor))
 
-if target <= opt_seg:
-    print(f"WARNING: shortest path ({min_len} steps) limits random condition to "
-          f"{target} segments instead of {target_desired}. "
-          f"Consider a larger map or fewer obstacles.", file=sys.stderr)
+# Use a GLOBAL time grid: divide the makespan into `target` equal slots and
+# assign each step's segment by its absolute timestep index.  Short agents
+# simply don't appear in later segments (they've reached their goal and
+# disappeared), so no per-agent cap is needed.
+T_max = max(len(p) for p in d["plans"].values()) - 1  # max timestep index
 
 for path in d["plans"].values():
-    L = len(path)
     for i, step in enumerate(path):
-        # Linearly map index 0 → segment 1, index L-1 → segment target
-        step["cost"] = math.floor(i * (target - 1) / max(L - 1, 1)) + 1
+        step["cost"] = min(math.floor(i * target / max(T_max, 1)) + 1, target)
 
 d["metrics"]["segment_cost"] = target
 
