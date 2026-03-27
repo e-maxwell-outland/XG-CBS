@@ -106,13 +106,6 @@ def visualize(env: dict, result: dict, ax=None, show_start_goal=True):
                 zorder=5, label=f"{agent_name} goal",
             )
 
-    handles, labels = ax.get_legend_handles_labels()
-    by_agent = {}
-    for h, l in zip(handles, labels):
-        agent = l.replace(" start", "").replace(" goal", "")
-        if agent not in by_agent:
-            by_agent[agent] = h
-    ax.legend(by_agent.values(), by_agent.keys(), loc="upper left", fontsize=8)
     return ax
 
 
@@ -175,8 +168,6 @@ def visualize_segments(env: dict, result: dict, segment_cost: int,
                 ax.scatter([goal[0]], [goal[1]], marker="*", s=350, c=color,
                            edgecolors="black", linewidths=1.5, zorder=5)
 
-        if seg_idx == 0:
-            ax.legend(loc="upper left", fontsize=8)
 
     for idx in range(n_segments, len(axes)):
         axes[idx].set_visible(False)
@@ -214,7 +205,6 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
             fontsize=14, fontweight="bold",
         )
 
-        legend_handles = []
         for i, (agent_name, path) in enumerate(plans.items()):
             color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
 
@@ -231,8 +221,6 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
                 ax.plot(xs, ys, color=color, linewidth=2.5, zorder=4, alpha=0.9)
                 ax.scatter(xs, ys, c=color, s=80, zorder=5,
                            edgecolors="white", linewidths=1.2)
-
-            legend_handles.append(mpatches.Patch(color=color, label=agent_name))
 
         # Start / goal markers
         for i, (agent_name, path) in enumerate(plans.items()):
@@ -258,7 +246,6 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
                        edgecolors="black", linewidths=1, zorder=6,
                        alpha=1.0 if goal_in else 0.25)
 
-        ax.legend(handles=legend_handles, loc="upper left", fontsize=8)
         plt.tight_layout()
 
         out_path = output_dir / f"seg_{cost_level}.png"
@@ -303,7 +290,6 @@ def animate_trajectories(env: dict, result: dict, output_path: Path, fps: int = 
                 color=color, linewidth=1.5, alpha=0.18, zorder=2)
 
     # Start / goal markers (static, slightly faded)
-    legend_handles = []
     for i, (agent_name, _) in enumerate(plans.items()):
         color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
         if agent_name in agents_cfg:
@@ -313,9 +299,6 @@ def animate_trajectories(env: dict, result: dict, output_path: Path, fps: int = 
                        edgecolors="black", linewidths=1.5, zorder=3, alpha=0.45)
             ax.scatter([g[0]], [g[1]], marker="*", s=250, c=color,
                        edgecolors="black", linewidths=1, zorder=3, alpha=0.45)
-        legend_handles.append(mpatches.Patch(color=color, label=agent_name))
-
-    ax.legend(handles=legend_handles, loc="upper left", fontsize=8)
 
     # Agent position markers (animated)
     agent_scatters = []
@@ -385,8 +368,6 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
         for i in range(n_agents)
     ]
 
-    legend_handles = []
-
     for i, (agent_name, path) in enumerate(plans.items()):
         cmap = plt.get_cmap(_AGENT_CMAPS[i % len(_AGENT_CMAPS)])
         dark_color = cmap(0.85)
@@ -411,9 +392,6 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
                        marker="*", s=320, color=dark_color,
                        edgecolors="black", linewidths=1, zorder=5)
 
-        legend_handles.append(mpatches.Patch(color=dark_color, label=agent_name))
-
-    ax.legend(handles=legend_handles, loc="upper left", fontsize=8)
     return fig, ax
 
 
