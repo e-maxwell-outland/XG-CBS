@@ -208,11 +208,6 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
         for i, (agent_name, path) in enumerate(plans.items()):
             color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
 
-            # Full path grayed for context
-            xs_all = [p["x"] for p in path]
-            ys_all = [p["y"] for p in path]
-            ax.plot(xs_all, ys_all, color=color, linewidth=1.5, alpha=0.15, zorder=2)
-
             # This segment in full color
             seg_pts = [p for p in path if p["cost"] == cost_level]
             if seg_pts:
@@ -230,18 +225,11 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
             start = agents_cfg[agent_name]["start"]
             goal = agents_cfg[agent_name]["goal"]
 
-            start_in = any(
-                p["x"] == start[0] and p["y"] == start[1] and p["cost"] == cost_level
-                for p in path
-            )
             goal_in = any(
                 p["x"] == goal[0] and p["y"] == goal[1] and p["cost"] == cost_level
                 for p in path
             )
 
-            ax.scatter([start[0]], [start[1]], marker="o", s=180, c=color,
-                       edgecolors="black", linewidths=1.5, zorder=6,
-                       alpha=1.0 if start_in else 0.25)
             ax.scatter([goal[0]], [goal[1]], marker="*", s=320, c=color,
                        edgecolors="black", linewidths=1, zorder=6,
                        alpha=1.0 if goal_in else 0.25)
@@ -257,8 +245,8 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
 def animate_trajectories(env: dict, result: dict, output_path: Path, fps: int = 4):
     """Animate agent trajectories frame-by-frame and export as MP4.
 
-    Requires ffmpeg. Each frame shows all agents at one timestep, with their
-    full paths drawn faintly behind for spatial context.
+    Requires ffmpeg. Each frame shows all agents at one timestep, with faded
+    goal markers as static reference points.
     """
     import matplotlib.animation as manim
 
@@ -283,20 +271,11 @@ def animate_trajectories(env: dict, result: dict, output_path: Path, fps: int = 
     fig, ax = plt.subplots(figsize=(8, 8))
     _draw_grid(ax, nx, ny, obstacles)
 
-    # Faint full paths
-    for i, (agent_name, path) in enumerate(plans.items()):
-        color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
-        ax.plot([p["x"] for p in path], [p["y"] for p in path],
-                color=color, linewidth=1.5, alpha=0.18, zorder=2)
-
-    # Start / goal markers (static, slightly faded)
+    # Goal markers (static, slightly faded)
     for i, (agent_name, _) in enumerate(plans.items()):
         color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
         if agent_name in agents_cfg:
-            s = agents_cfg[agent_name]["start"]
             g = agents_cfg[agent_name]["goal"]
-            ax.scatter([s[0]], [s[1]], marker="o", s=120, c=color,
-                       edgecolors="black", linewidths=1.5, zorder=3, alpha=0.45)
             ax.scatter([g[0]], [g[1]], marker="*", s=250, c=color,
                        edgecolors="black", linewidths=1, zorder=3, alpha=0.45)
 
@@ -427,7 +406,7 @@ def main():
         metavar="DIR",
         help=(
             "Save one PNG per segment to DIR/seg_N.png. "
-            "Full paths shown faintly; this segment's portion highlighted."
+            "Each image shows the active segment's paths and faded goal markers."
         ),
     )
     parser.add_argument(
