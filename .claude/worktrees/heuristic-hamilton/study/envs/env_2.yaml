@@ -1,0 +1,27 @@
+map:
+  dimensions: [2, 6]
+  # Two-lane highway, walls implicit as grid boundaries.
+  # x=0: left lane (agent A going down). x=1: right lane (B and C going up).
+  # B starts behind C and must pass C to reach its further goal.
+  # Full boundary seal: y=6 phantom row + x=2 phantom column.
+  obstacles:
+    - [0, 6]   # y=6 phantom row
+    - [1, 6]
+    - [2, 6]
+    - [2, 0]   # x=2 phantom column
+    - [2, 1]
+    - [2, 2]
+    - [2, 3]
+    - [2, 4]
+    - [2, 5]
+
+agents:
+  - name: "agent0"
+    start: [0, 5]
+    goal:  [0, 0]
+  - name: "agent1"
+    start: [1, 0]
+    goal:  [1, 5]
+  - name: "agent2"
+    start: [1, 1]
+    goal:  [1, 4]

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout:*)",
+      "Bash(chmod +x /Users/emaxwell/VSCodeProjects/XG-CBS/.claude/worktrees/heuristic-hamilton/study/generate_stimuli.sh)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\(''generate_map.py''\\).read\\(\\)\\); print\\(''generate_map.py OK''\\)\")",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\(''visualize.py''\\).read\\(\\)\\); print\\(''visualize.py OK''\\)\")",
+      "Bash(python3 generate_map.py --width 16 --height 16 --agents 16 --seed 1 -o /tmp/test_map.yaml)",
+      "Read(//tmp/**)",
+      "Bash(python3 visualize.py --help)",
+      "Bash(bash -n study/generate_stimuli.sh)",
+      "Bash(python3 -c \":*)",
+      "Bash(git -C /Users/emaxwell/VSCodeProjects/XG-CBS/.claude/worktrees/heuristic-hamilton status --short)",
+      "Bash(./build/Planner Plan /tmp/large_test.yaml CBS A 30.0)"
+    ]
+  }
+}

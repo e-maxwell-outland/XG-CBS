@@ -22,29 +22,10 @@ _AGENT_CMAPS = [
     "Oranges", "YlOrBr", "PuRd", "Greys",
 ]
 
-# Shared discrete palette — 20 visually distinct colors, same order everywhere.
-# Enough for 16+ agents without repeating.
+# Shared discrete palette (same order across all visualisation modes)
 _AGENT_COLORS = [
-    "#377eb8",  # blue
-    "#e41a1c",  # red
-    "#4daf4a",  # green
-    "#984ea3",  # purple
-    "#ff7f00",  # orange
-    "#a65628",  # brown
-    "#f781bf",  # pink
-    "#999999",  # grey
-    "#e6ab02",  # gold
-    "#1b9e77",  # teal
-    "#d95f02",  # burnt orange
-    "#7570b3",  # slate purple
-    "#e7298a",  # hot pink
-    "#66a61e",  # olive green
-    "#e6194b",  # crimson
-    "#4363d8",  # cobalt
-    "#469990",  # dark cyan
-    "#9a6324",  # khaki brown
-    "#800000",  # maroon
-    "#808000",  # olive
+    "#377eb8", "#e41a1c", "#4daf4a", "#984ea3",
+    "#ff7f00", "#a65628", "#f781bf", "#999999",
 ]
 
 
@@ -72,26 +53,10 @@ def load_result_dir(exp_dir: Path):
     return env, result
 
 
-def _effective_dims(env, plans):
-    """Return grid dimensions large enough to contain all agent positions.
-
-    XG-CBS sometimes outputs positions one cell beyond the declared grid edge
-    (off-by-one in the planner).  Expanding the display dimensions here keeps
-    every agent on-screen without modifying the planner output.
-    """
-    nx, ny = env["map"]["dimensions"]
-    for path in plans.values():
-        for p in path:
-            nx = max(nx, p["x"] + 1)
-            ny = max(ny, p["y"] + 1)
-    return nx, ny
-
-
 def _draw_grid(ax, nx, ny, obstacles):
     """Draw grid lines and obstacle patches."""
     ax.set_xlim(-0.5, nx - 0.5)
     ax.set_ylim(-0.5, ny - 0.5)
-    ax.autoscale(False)   # lock limits — subsequent artists must not expand them
     ax.set_aspect("equal")
     ax.set_facecolor("#f8f8f8")
     for x in range(nx + 1):
@@ -111,7 +76,8 @@ def visualize(env: dict, result: dict, ax=None, show_start_goal=True):
     if ax is None:
         ax = plt.gca()
 
-    nx, ny = _effective_dims(env, result["plans"])
+    dims = env["map"]["dimensions"]
+    nx, ny = dims[0], dims[1]
     obstacles = env["map"].get("obstacles") or []
     agents_cfg = {a["name"]: a for a in env["agents"]}
     plans = result["plans"]
@@ -140,6 +106,13 @@ def visualize(env: dict, result: dict, ax=None, show_start_goal=True):
                 zorder=5, label=f"{agent_name} goal",
             )
 
+    handles, labels = ax.get_legend_handles_labels()
+    by_agent = {}
+    for h, l in zip(handles, labels):
+        agent = l.replace(" start", "").replace(" goal", "")
+        if agent not in by_agent:
+            by_agent[agent] = h
+    ax.legend(by_agent.values(), by_agent.keys(), loc="upper left", fontsize=8)
     return ax
 
 
@@ -150,7 +123,8 @@ def visualize_segments(env: dict, result: dict, segment_cost: int,
     Args:
         segment_label_fmt: format string with {i} (1-based) and {n} (total).
     """
-    nx, ny = _effective_dims(env, result["plans"])
+    dims = env["map"]["dimensions"]
+    nx, ny = dims[0], dims[1]
     obstacles = env["map"].get("obstacles") or []
     agents_cfg = {a["name"]: a for a in env["agents"]}
     plans = result["plans"]
@@ -201,6 +175,8 @@ def visualize_segments(env: dict, result: dict, segment_cost: int,
                 ax.scatter([goal[0]], [goal[1]], marker="*", s=350, c=color,
                            edgecolors="black", linewidths=1.5, zorder=5)
 
+        if seg_idx == 0:
+            ax.legend(loc="upper left", fontsize=8)
 
     for idx in range(n_segments, len(axes)):
         axes[idx].set_visible(False)
@@ -219,7 +195,8 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
     - Start/goal markers (full opacity if in this segment, faded otherwise)
     - Title: "Segment N of M"
     """
-    nx, ny = _effective_dims(env, result["plans"])
+    dims = env["map"]["dimensions"]
+    nx, ny = dims[0], dims[1]
     obstacles = env["map"].get("obstacles") or []
     agents_cfg = {a["name"]: a for a in env["agents"]}
     plans = result["plans"]
@@ -237,8 +214,14 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
             fontsize=14, fontweight="bold",
         )
 
+        legend_handles = []
         for i, (agent_name, path) in enumerate(plans.items()):
             color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
+
+            # Full path grayed for context
+            xs_all = [p["x"] for p in path]
+            ys_all = [p["y"] for p in path]
+            ax.plot(xs_all, ys_all, color=color, linewidth=1.5, alpha=0.15, zorder=2)
 
             # This segment in full color
             seg_pts = [p for p in path if p["cost"] == cost_level]
@@ -249,24 +232,33 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
                 ax.scatter(xs, ys, c=color, s=80, zorder=5,
                            edgecolors="white", linewidths=1.2)
 
-        # Goal stars: visible only in segment 1 (reference) and the segment
-        # where the agent arrives (last segment of its path).
+            legend_handles.append(mpatches.Patch(color=color, label=agent_name))
+
+        # Start / goal markers
         for i, (agent_name, path) in enumerate(plans.items()):
             if agent_name not in agents_cfg:
                 continue
             color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
+            start = agents_cfg[agent_name]["start"]
             goal = agents_cfg[agent_name]["goal"]
 
+            start_in = any(
+                p["x"] == start[0] and p["y"] == start[1] and p["cost"] == cost_level
+                for p in path
+            )
             goal_in = any(
                 p["x"] == goal[0] and p["y"] == goal[1] and p["cost"] == cost_level
                 for p in path
             )
-            is_first_seg = (cost_level == 1)
 
-            if goal_in or is_first_seg:
-                ax.scatter([goal[0]], [goal[1]], marker="*", s=320, c=color,
-                           edgecolors="black", linewidths=1, zorder=6)
+            ax.scatter([start[0]], [start[1]], marker="o", s=180, c=color,
+                       edgecolors="black", linewidths=1.5, zorder=6,
+                       alpha=1.0 if start_in else 0.25)
+            ax.scatter([goal[0]], [goal[1]], marker="*", s=320, c=color,
+                       edgecolors="black", linewidths=1, zorder=6,
+                       alpha=1.0 if goal_in else 0.25)
 
+        ax.legend(handles=legend_handles, loc="upper left", fontsize=8)
         plt.tight_layout()
 
         out_path = output_dir / f"seg_{cost_level}.png"
@@ -278,66 +270,69 @@ def visualize_segments_individual(env: dict, result: dict, segment_cost: int,
 def animate_trajectories(env: dict, result: dict, output_path: Path, fps: int = 4):
     """Animate agent trajectories frame-by-frame and export as MP4.
 
-    Requires ffmpeg. Each frame shows all agents at one timestep, with faded
-    goal markers as static reference points.
+    Requires ffmpeg. Each frame shows all agents at one timestep, with their
+    full paths drawn faintly behind for spatial context.
     """
     import matplotlib.animation as manim
 
-    nx, ny = _effective_dims(env, result["plans"])
+    dims = env["map"]["dimensions"]
+    nx, ny = dims[0], dims[1]
     obstacles = env["map"].get("obstacles") or []
     agents_cfg = {a["name"]: a for a in env["agents"]}
     plans = result["plans"]
 
-    # Path index = timestep (wait actions appear as repeated positions).
-    # CBS uses the "disappearing" model: agents vanish after reaching their goal,
-    # so we hide each agent (and its goal marker) once it arrives.
+    # Build position-by-timestep lookup; path is ordered by timestep (index = time)
     T_max = max(len(path) - 1 for path in plans.values())
-    t_done = {name: len(path) - 1 for name, path in plans.items()}
-    positions = {
-        name: {t: (p["x"], p["y"]) for t, p in enumerate(path)}
-        for name, path in plans.items()
-    }
+    positions = {}
+    for agent_name, path in plans.items():
+        by_time = {t: (p["x"], p["y"]) for t, p in enumerate(path)}
+        # Agent stays at final position after its path ends
+        last = by_time[max(by_time)]
+        for t in range(T_max + 1):
+            if t not in by_time:
+                by_time[t] = last
+        positions[agent_name] = by_time
 
     fig, ax = plt.subplots(figsize=(8, 8))
     _draw_grid(ax, nx, ny, obstacles)
 
-    # All scatters start empty — update() populates / clears them each frame.
-    # This ensures blit doesn't preserve stale markers in the cached background.
-    _empty = np.empty((0, 2))
+    # Faint full paths
+    for i, (agent_name, path) in enumerate(plans.items()):
+        color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
+        ax.plot([p["x"] for p in path], [p["y"] for p in path],
+                color=color, linewidth=1.5, alpha=0.18, zorder=2)
 
+    # Start / goal markers (static, slightly faded)
+    legend_handles = []
+    for i, (agent_name, _) in enumerate(plans.items()):
+        color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
+        if agent_name in agents_cfg:
+            s = agents_cfg[agent_name]["start"]
+            g = agents_cfg[agent_name]["goal"]
+            ax.scatter([s[0]], [s[1]], marker="o", s=120, c=color,
+                       edgecolors="black", linewidths=1.5, zorder=3, alpha=0.45)
+            ax.scatter([g[0]], [g[1]], marker="*", s=250, c=color,
+                       edgecolors="black", linewidths=1, zorder=3, alpha=0.45)
+        legend_handles.append(mpatches.Patch(color=color, label=agent_name))
+
+    ax.legend(handles=legend_handles, loc="upper left", fontsize=8)
+
+    # Agent position markers (animated)
     agent_scatters = []
     for i, agent_name in enumerate(plans):
         color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
-        sc = ax.scatter([], [], color=color, s=220, zorder=6,
+        sc = ax.scatter([], [], c=color, s=220, zorder=6,
                         edgecolors="white", linewidths=1.8)
         agent_scatters.append((agent_name, sc))
-
-    goal_scatters = []
-    for i, (agent_name, _) in enumerate(plans.items()):
-        color = _AGENT_COLORS[i % len(_AGENT_COLORS)]
-        sc = ax.scatter([], [], marker="*", color=color, s=300, zorder=3,
-                        edgecolors="black", linewidths=1, alpha=0.55)
-        goal_scatters.append((agent_name, sc))
 
     title = ax.set_title(f"Timestep 0 / {T_max}")
 
     def update(frame):
         for agent_name, sc in agent_scatters:
-            if frame <= t_done[agent_name]:
-                x, y = positions[agent_name][frame]
-                sc.set_offsets([[x, y]])
-            else:
-                sc.set_offsets(_empty)
-
-        for agent_name, sc in goal_scatters:
-            if frame <= t_done[agent_name] and agent_name in agents_cfg:
-                g = agents_cfg[agent_name]["goal"]
-                sc.set_offsets([[g[0], g[1]]])
-            else:
-                sc.set_offsets(_empty)
-
+            x, y = positions[agent_name][frame]
+            sc.set_offsets([[x, y]])
         title.set_text(f"Timestep {frame} / {T_max}")
-        return [sc for _, sc in agent_scatters] + [sc for _, sc in goal_scatters] + [title]
+        return [sc for _, sc in agent_scatters] + [title]
 
     ani = manim.FuncAnimation(
         fig, update, frames=T_max + 1,
@@ -370,7 +365,8 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
     else:
         fig = ax.get_figure()
 
-    nx, ny = _effective_dims(env, result["plans"])
+    dims = env["map"]["dimensions"]
+    nx, ny = dims[0], dims[1]
     obstacles = env["map"].get("obstacles") or []
     agents_cfg = {a["name"]: a for a in env["agents"]}
     plans = result["plans"]
@@ -388,6 +384,8 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
         )
         for i in range(n_agents)
     ]
+
+    legend_handles = []
 
     for i, (agent_name, path) in enumerate(plans.items()):
         cmap = plt.get_cmap(_AGENT_CMAPS[i % len(_AGENT_CMAPS)])
@@ -413,6 +411,9 @@ def visualize_condition_a(env: dict, result: dict, k: int = 2, ax=None,
                        marker="*", s=320, color=dark_color,
                        edgecolors="black", linewidths=1, zorder=5)
 
+        legend_handles.append(mpatches.Patch(color=dark_color, label=agent_name))
+
+    ax.legend(handles=legend_handles, loc="upper left", fontsize=8)
     return fig, ax
 
 
@@ -448,7 +449,7 @@ def main():
         metavar="DIR",
         help=(
             "Save one PNG per segment to DIR/seg_N.png. "
-            "Each image shows the active segment's paths and faded goal markers."
+            "Full paths shown faintly; this segment's portion highlighted."
         ),
     )
     parser.add_argument(

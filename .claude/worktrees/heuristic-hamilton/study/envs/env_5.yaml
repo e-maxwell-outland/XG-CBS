@@ -1,0 +1,34 @@
+map:
+  dimensions: [7, 3]
+  # Two horizontal lanes (y=0 and y=2) connected by a 2-cell-wide bridge at x=3,4.
+  # Top/bottom blocking rows removed — lanes are now the grid edges.
+  # All agents must cross the bridge → guaranteed segment_cost >= 2.
+  # Full boundary seal: y=3 phantom row + x=7 phantom column.
+  obstacles:
+    - [0, 1]   # bridge wall (gaps at x=3 and x=4)
+    - [1, 1]
+    - [2, 1]
+    - [5, 1]
+    - [6, 1]
+    - [0, 3]   # y=3 phantom row
+    - [1, 3]
+    - [2, 3]
+    - [3, 3]
+    - [4, 3]
+    - [5, 3]
+    - [6, 3]
+    - [7, 3]
+    - [7, 0]   # x=7 phantom column
+    - [7, 1]
+    - [7, 2]
+
+agents:
+  - name: "agent0"
+    start: [0, 0]
+    goal:  [6, 2]
+  - name: "agent1"
+    start: [6, 2]
+    goal:  [0, 0]
+  - name: "agent2"
+    start: [0, 2]
+    goal:  [6, 0]

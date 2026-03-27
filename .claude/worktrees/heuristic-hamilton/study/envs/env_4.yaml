@@ -1,0 +1,34 @@
+map:
+  dimensions: [7, 4]
+  # S-curve double wall with open bypass row at y=0.
+  # Wall 1 at x=2: gap at top (y=3). Wall 2 at x=4: gap at y=1.
+  # y=0 row is fully open — second route past both walls for waiting/bypass.
+  # Full boundary seal: y=4 phantom row + x=7 phantom column.
+  obstacles:
+    - [2, 1]   # wall 1 (gap at y=3)
+    - [2, 2]
+    - [4, 2]   # wall 2 (gap at y=1)
+    - [4, 3]
+    - [0, 4]   # y=4 phantom row
+    - [1, 4]
+    - [2, 4]
+    - [3, 4]
+    - [4, 4]
+    - [5, 4]
+    - [6, 4]
+    - [7, 4]
+    - [7, 0]   # x=7 phantom column
+    - [7, 1]
+    - [7, 2]
+    - [7, 3]
+
+agents:
+  - name: "agent0"
+    start: [0, 0]
+    goal:  [6, 3]
+  - name: "agent1"
+    start: [0, 1]
+    goal:  [6, 2]
+  - name: "agent2"
+    start: [0, 2]
+    goal:  [6, 0]
