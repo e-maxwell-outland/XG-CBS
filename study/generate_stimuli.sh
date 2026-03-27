@@ -1,116 +1,158 @@
 #!/usr/bin/env bash
-# generate_stimuli.sh — produce all 15 study figures (5 environments × 3 conditions).
+# generate_stimuli.sh — generate 5 large random environments and produce all study outputs.
 #
-# Run from the repository root:
+# Run from the REPOSITORY ROOT:
 #   bash study/generate_stimuli.sh
 #
 # Prerequisites:
-#   - ./build/Planner binary must exist (run ./run.sh first if needed)
-#   - Python 3 with matplotlib, numpy, pyyaml installed
+#   - ./build/Planner binary must exist  (run ./run.sh to build)
+#   - Python 3 with matplotlib, numpy, pyyaml  (pip install -r requirements.txt)
+#   - ffmpeg  (installed in the Docker container; apt-get install ffmpeg otherwise)
 #
-# Outputs (all under study/figures/):
-#   condition_a/env_N.png  — full path, colour-gradient + time dots
-#   condition_b/env_N.png  — fixed-interval segments (XG-CBS + k extra)
-#   condition_c/env_N.png  — XG-CBS optimal segmentation
+# Outputs (all under study/):
+#   figures/trajectories/env_N.mp4         — animated agent trajectories (from CBS paths)
+#   figures/cbs_segments/env_N/seg_K.png   — individual segment images, CBS  ("random")
+#   figures/xgcbs_segments/env_N/seg_K.png — individual segment images, XG-CBS ("optimized")
+#   results/cbs/env_N/{result.json,env.yaml}
+#   results/xgcbs/env_N/{result.json,env.yaml}
 #
-# Configurable variables:
-K=${K:-2}                        # extra segments for Condition B (default 2)
-COST_BOUND=${COST_BOUND:-8}      # XG-CBS explanation cost bound (raised: some envs need >4 segments)
-TIME_LIMIT=${TIME_LIMIT:-300.0}  # planner time limit in seconds (5 min per env)
+# Override any parameter via environment variable, e.g.:
+#   AGENTS=20 TIME_LIMIT=600 bash study/generate_stimuli.sh
+WIDTH=${WIDTH:-16}
+HEIGHT=${HEIGHT:-16}
+AGENTS=${AGENTS:-16}
+OBSTACLES=${OBSTACLES:-0.15}
+COST_BOUND=${COST_BOUND:-8}     # XG-CBS explanation cost bound
+TIME_LIMIT=${TIME_LIMIT:-300.0} # planner time limit per environment (seconds)
+
 PLANNER_BIN=./build/Planner
 STUDY_DIR=study
 
 set -euo pipefail
 
-# Colour helpers
+# ── Colour helpers ────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()  { echo -e "${GREEN}[INFO]${NC}  $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
 error() { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 
-# Validate prerequisites
-[[ -x "$PLANNER_BIN" ]] || error "Planner binary not found at $PLANNER_BIN. Run ./run.sh to build."
+# ── Prerequisites ─────────────────────────────────────────────────────────────
+[[ -x "$PLANNER_BIN" ]] \
+    || error "Planner binary not found at $PLANNER_BIN. Run ./run.sh to build first."
 python3 -c "import matplotlib, numpy, yaml" 2>/dev/null \
-    || error "Python dependencies missing. Run: pip install matplotlib numpy pyyaml"
+    || error "Python dependencies missing. Run: pip install -r requirements.txt"
+ffmpeg -version &>/dev/null \
+    || error "ffmpeg not found. Install with: apt-get install ffmpeg"
 
-# Create output directories
-mkdir -p "$STUDY_DIR/figures/condition_a" \
-         "$STUDY_DIR/figures/condition_b" \
-         "$STUDY_DIR/figures/condition_c"
+# ── Output directories ────────────────────────────────────────────────────────
+mkdir -p \
+    "$STUDY_DIR/envs" \
+    "$STUDY_DIR/results/cbs" \
+    "$STUDY_DIR/results/xgcbs" \
+    "$STUDY_DIR/figures/trajectories" \
+    "$STUDY_DIR/figures/cbs_segments" \
+    "$STUDY_DIR/figures/xgcbs_segments"
 
-ENVS=("env_1" "env_2" "env_3" "env_4" "env_5")
+# ── Helper: find the newest result.json written since a timestamp file ────────
+newest_result() {
+    find results -maxdepth 3 -name "result.json" -newer "$1" \
+        -exec dirname {} \; 2>/dev/null | head -1
+}
+
 FAILED=()
 
-for ENV in "${ENVS[@]}"; do
-    ENV_YAML="$STUDY_DIR/envs/${ENV}.yaml"
-    [[ -f "$ENV_YAML" ]] || { warn "Missing $ENV_YAML — skipping"; continue; }
+for N in 1 2 3 4 5; do
+    ENV_NAME="env_${N}"
+    ENV_YAML="$STUDY_DIR/envs/${ENV_NAME}.yaml"
 
-    info "===== $ENV ====="
+    info "════════════════════════════════════════"
+    info "  $ENV_NAME"
+    info "════════════════════════════════════════"
 
-    # --- Run XG-CBS ---
-    info "Running XG-CBS on $ENV…"
-    # Stamp a temp file before running the planner so we can find the new result dir.
+    # ── 1. Generate random map ────────────────────────────────────────────────
+    info "Generating ${WIDTH}×${HEIGHT} map, $AGENTS agents (seed=$N)…"
+    python3 generate_map.py \
+        --width "$WIDTH" --height "$HEIGHT" \
+        --agents "$AGENTS" --obstacles "$OBSTACLES" \
+        --seed "$N" -o "$ENV_YAML"
+
+    # ── 2. Run CBS baseline ───────────────────────────────────────────────────
+    info "Running CBS on $ENV_NAME…"
     _TS=$(mktemp)
-    $PLANNER_BIN Plan "$ENV_YAML" XG-CBS XG-A "$TIME_LIMIT" "$COST_BOUND" 2>&1
-    RESULT_DIR=$(find results -maxdepth 3 -name "result.json" -newer "$_TS" \
-                   -exec dirname {} \; 2>/dev/null | head -1)
+    $PLANNER_BIN Plan "$ENV_YAML" CBS A "$TIME_LIMIT" 2>&1 | tail -5
+    CBS_RAW=$(newest_result "$_TS")
     rm -f "$_TS"
-    [[ -n "$RESULT_DIR" && -f "$RESULT_DIR/result.json" ]] \
-        || error "Could not locate result directory after planning $ENV — did the planner succeed?"
-    info "Result written to $RESULT_DIR"
-
-    # --- Verify segment_cost >= 2 ---
-    SEG_COST=$(python3 -c "
-import json, sys
-with open('$RESULT_DIR/result.json') as f:
-    d = json.load(f)
-print(d['metrics'].get('segment_cost', 1))
-")
-    if [[ "$SEG_COST" -lt 2 ]]; then
-        warn "$ENV produced segment_cost=$SEG_COST (need >= 2). Add obstacles to force crossings."
-        FAILED+=("$ENV (segment_cost=$SEG_COST)")
+    if [[ -z "$CBS_RAW" ]]; then
+        warn "CBS failed for $ENV_NAME — skipping."
+        FAILED+=("$ENV_NAME (CBS planning failed)")
         continue
     fi
-    info "$ENV: segment_cost=$SEG_COST ✓"
 
-    # --- Condition C: XG-CBS optimal segmentation ---
-    info "Generating Condition C figure…"
-    python3 visualize.py "$RESULT_DIR" \
-        --segments \
-        -o "$STUDY_DIR/figures/condition_c/${ENV}.png"
+    # Copy to stable study location
+    CBS_RESULT="$STUDY_DIR/results/cbs/$ENV_NAME"
+    mkdir -p "$CBS_RESULT"
+    cp "$CBS_RAW/result.json" "$CBS_RAW/env.yaml" "$CBS_RESULT/"
 
-    # --- Apply fixed-interval segmentation (Condition B) ---
-    B_OUT="$STUDY_DIR/results/condition_b/$ENV"
-    info "Applying fixed-interval segmentation (k=$K)…"
-    python3 study/apply_fixed_interval.py "$RESULT_DIR" --k "$K" -o "$B_OUT"
+    # ── 3. Run XG-CBS with SR-A* ──────────────────────────────────────────────
+    info "Running XG-CBS (SR-A*) on $ENV_NAME…"
+    _TS=$(mktemp)
+    $PLANNER_BIN Plan "$ENV_YAML" XG-CBS S-A "$TIME_LIMIT" "$COST_BOUND" 2>&1 | tail -5
+    XG_RAW=$(newest_result "$_TS")
+    rm -f "$_TS"
+    if [[ -z "$XG_RAW" ]]; then
+        warn "XG-CBS failed for $ENV_NAME — skipping."
+        FAILED+=("$ENV_NAME (XG-CBS planning failed — try raising TIME_LIMIT or COST_BOUND)")
+        continue
+    fi
 
-    # --- Condition B: fixed-interval segments ---
-    info "Generating Condition B figure…"
-    python3 visualize.py "$B_OUT" \
-        --condition-b \
-        -o "$STUDY_DIR/figures/condition_b/${ENV}.png"
+    XGCBS_RESULT="$STUDY_DIR/results/xgcbs/$ENV_NAME"
+    mkdir -p "$XGCBS_RESULT"
+    cp "$XG_RAW/result.json" "$XG_RAW/env.yaml" "$XGCBS_RESULT/"
 
-    # --- Condition A: full path with gradient + time dots ---
-    info "Generating Condition A figure…"
-    python3 visualize.py "$RESULT_DIR" \
-        --condition-a --k "$K" \
-        -o "$STUDY_DIR/figures/condition_a/${ENV}.png"
+    # Report segment counts
+    CBS_SEG=$(python3 -c "
+import json
+d = json.load(open('$CBS_RESULT/result.json'))
+print(d['metrics']['segment_cost'])")
+    XG_SEG=$(python3 -c "
+import json
+d = json.load(open('$XGCBS_RESULT/result.json'))
+print(d['metrics']['segment_cost'])")
+    info "$ENV_NAME: CBS segments=$CBS_SEG  →  XG-CBS segments=$XG_SEG"
 
-    info "$ENV complete."
+    # ── 4. Trajectory video (animated MP4 from CBS paths) ─────────────────────
+    info "Generating trajectory video…"
+    python3 visualize.py "$CBS_RESULT" \
+        --animate -o "$STUDY_DIR/figures/trajectories/${ENV_NAME}.mp4"
+
+    # ── 5. Individual segment PNGs — CBS ("random" segmentation) ─────────────
+    info "Generating CBS segment images ($CBS_SEG segments)…"
+    python3 visualize.py "$CBS_RESULT" \
+        --segments-dir "$STUDY_DIR/figures/cbs_segments/$ENV_NAME"
+
+    # ── 6. Individual segment PNGs — XG-CBS ("optimized" segmentation) ────────
+    info "Generating XG-CBS segment images ($XG_SEG segments)…"
+    python3 visualize.py "$XGCBS_RESULT" \
+        --segments-dir "$STUDY_DIR/figures/xgcbs_segments/$ENV_NAME"
+
+    info "$ENV_NAME complete."
     echo
 done
 
-# --- Summary ---
-echo "========================================"
+# ── Summary ───────────────────────────────────────────────────────────────────
+echo "════════════════════════════════════════"
 if [[ ${#FAILED[@]} -eq 0 ]]; then
     info "All 5 environments completed successfully."
-    info "Figures saved under $STUDY_DIR/figures/"
+    info "Outputs under $STUDY_DIR/:"
+    info "  figures/trajectories/    — 5 MP4 trajectory videos"
+    info "  figures/cbs_segments/    — per-segment PNGs, CBS  (\"random\")"
+    info "  figures/xgcbs_segments/  — per-segment PNGs, XG-CBS (\"optimized\")"
+    info "  results/cbs/             — raw CBS planner output"
+    info "  results/xgcbs/           — raw XG-CBS planner output"
 else
-    warn "The following environments need redesign (segment_cost < 2):"
+    warn "The following environments encountered errors:"
     for F in "${FAILED[@]}"; do
         warn "  • $F"
     done
-    warn "Edit the YAML files in $STUDY_DIR/envs/ to add obstacles that force path crossings,"
-    warn "then re-run this script."
     exit 1
 fi

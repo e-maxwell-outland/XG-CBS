@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     screen \
     vim \
     valgrind \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install newer CMake via pip (Ubuntu 22.04 ships 3.22, need 3.25+)

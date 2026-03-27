@@ -82,7 +82,7 @@ Build complete: build/Planner
 
 ## Environments
 
-Place YAML environment files in `envs/`. Two are included:
+### Built-in small maps (`envs/`)
 
 | File | Grid | Agents | Notes |
 |---|---|---|---|
@@ -90,6 +90,19 @@ Place YAML environment files in `envs/`. Two are included:
 | `roadCrossing.yaml` | 9×6 | 4 | Slightly harder |
 
 See [README.md](README.md) for the full YAML format spec to create your own.
+
+### Random map generator
+
+`generate_map.py` creates a random YAML environment at any scale:
+
+```bash
+python3 generate_map.py \
+    --width 16 --height 16 \
+    --agents 16 --obstacles 0.15 \
+    --seed 42 -o envs/large.yaml
+```
+
+All agent starts and goals are guaranteed reachable from each other. Use `--seed` for reproducibility.
 
 ---
 
@@ -107,25 +120,70 @@ Results are visible directly on your Mac in the repo's `results/` folder (via th
 
 ---
 
+## Visualization
+
+`visualize.py` has several modes:
+
+```bash
+# Default: full path overview
+python3 visualize.py <exp_dir> -o output.png
+
+# Segment subplot (all segments in one figure)
+python3 visualize.py <exp_dir> --segments -o output.png
+
+# Individual PNG per segment — for study participants to arrow through
+python3 visualize.py <exp_dir> --segments-dir path/to/output_dir/
+
+# Animated MP4 of agent trajectories (requires ffmpeg)
+python3 visualize.py <exp_dir> --animate -o trajectories.mp4
+python3 visualize.py <exp_dir> --animate --fps 6 -o trajectories.mp4
+```
+
+---
+
+## Study Stimuli (Advisor Demo + User Study)
+
+To generate all study outputs — 5 random 16×16 environments, trajectory videos, and per-segment images for both CBS ("random") and XG-CBS SR-A* ("optimized") conditions:
+
+```bash
+bash study/generate_stimuli.sh
+```
+
+This produces under `study/figures/`:
+
+| Output | Description |
+|---|---|
+| `trajectories/env_N.mp4` | Animated agent trajectories (CBS paths) |
+| `cbs_segments/env_N/seg_K.png` | One image per segment — CBS ("random" segmentation) |
+| `xgcbs_segments/env_N/seg_K.png` | One image per segment — XG-CBS ("optimized" segmentation) |
+
+Override defaults via environment variables:
+
+```bash
+WIDTH=32 HEIGHT=32 AGENTS=25 TIME_LIMIT=600 bash study/generate_stimuli.sh
+```
+
+---
+
 ## Suggested Pilot Workflow
 
 A good sequence for comparing baseline vs. explainable planning:
 
 ```bash
-# 1. Baseline — how does standard CBS do?
-./build/Planner Plan intersection.yaml CBS A 60.0
+# 1. Generate a 16×16 map
+python3 generate_map.py --width 16 --height 16 --agents 16 --seed 42 -o envs/large.yaml
 
-# 2. XG-CBS with SR-A* — fast, low segment count
-./build/Planner Plan intersection.yaml XG-CBS S-A 60.0 2
+# 2. Baseline — standard CBS
+./build/Planner Plan large.yaml CBS A 300.0
 
-# 3. XG-CBS with XG-A* — complete, optimal segment count
-./build/Planner Plan intersection.yaml XG-CBS XG-A 60.0 2
+# 3. XG-CBS with SR-A* — fast, minimizes segments
+./build/Planner Plan large.yaml XG-CBS S-A 300.0 8
 
-# 4. Push the explainability constraint harder
-./build/Planner Plan intersection.yaml XG-CBS XG-A 60.0 1
+# 4. Animate trajectories from CBS result
+python3 visualize.py results/<date>/exp-0 --animate -o cbs_traj.mp4
 
-# 5. Try a harder environment
-./build/Planner Plan roadCrossing.yaml XG-CBS S-A 60.0 2
+# 5. Individual segment images
+python3 visualize.py results/<date>/exp-1 --segments-dir xgcbs_segs/
 ```
 
-Compare `plot.png` outputs and `result.json` segment counts across runs.
+Compare segment counts and segment images across the CBS and XG-CBS runs.
